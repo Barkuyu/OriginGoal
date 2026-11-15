@@ -204,6 +204,10 @@ input[type=range]{width:100%;margin-top:8px;accent-color:#3ac07c;height:28px}
 #fxHud span{background:rgba(10,40,26,.82);border:1px solid rgba(255,255,255,.25);border-radius:10px;padding:3px 9px;font-size:12px;font-weight:700;color:#fff;width:max-content;max-width:100%}
 .cardBox .cIcon{font-size:54px;line-height:1.1}
 
+.btn.ball{background:linear-gradient(135deg,#fff 0 25%,#222 25% 50%,#fff 50% 75%,#222 75%);background-size:22px 22px;color:#fff;text-shadow:0 0 4px #000,0 0 6px #000}
+.btn.picked{outline:3px solid #ffe14a;transform:translateY(-2px)}
+.btn:disabled{opacity:.45}
+
 </style>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -319,10 +323,12 @@ input[type=range]{width:100%;margin-top:8px;accent-color:#3ac07c;height:28px}
 <div id="rulesOv" class="ov hide">
   <div class="card rules">
     <h2>📖 規則與操作</h2>
-    <h3>目標</h3><ul><li>你是場邊教練：每回合只能動「一名」棋子。把棋子從<b>對方門前兩個指定點（金色圈）</b>之一再走一步跨過球門線，得 1 分。先達到設定分數者獲勝。</li></ul>
+    <h3>目標</h3><ul><li>你是場邊教練：每回合只能動「一名」棋子。讓<b>持球的棋子</b>從<b>對方門前兩個指定點（金色圈）</b>之一再走一步跨過球門線，得 1 分。先達到設定分數者獲勝。</li></ul>
     <h3>開局</h3><ul><li>由電腦<b>擲硬幣</b>決定誰先擺棋；擺完陣再擲一次決定誰先開球。之後每回合才使用骰子，骰子一律擲在場地正中央。</li></ul>
     <h3>一個回合</h3>
-    <ul><li><b>選骰</b>：進攻骰（4/5/6）適合長距離；防守骰（1/2/3）適合短程、己方半場搶斷、門將搶斷。選一顆再擲。</li>
+    <ul><li><b>選骰</b>：3 顆骰子自選 2 顆再擲，結算順序固定為<b>進攻 → 防守 → 足球</b>。進攻骰（4/5/6）長程；防守骰（1/2/3）短程、己方半場搶斷、門將搶斷；兩顆移動骰可各讓任一己方棋子走該點數。</li>
+    <li><b>⚽ 足球與足球骰</b>：足球一定在某位球員身上（開球時在先攻方的門將），球員會在原地用腳盤球。足球骰（黑白色，5／9／13）只有<b>己方持球</b>時才能選，點數＝傳球距離：持球者周圍 N 格內的隊友都可接球，點選要傳的人，球會沿直線飛過去。N 格內沒有隊友就傳丟，球掉給最近的對手。</li>
+    <li><b>得分</b>：必須由<b>持球的棋子</b>走進對方得分區才算進球；沒帶球不能得分。進球後該棋子回己方綠格，球交給對方門將，換對方先攻。持球者被搶斷，球就歸搶斷者；被鬥牛撞飛或被任意門互換，球回到對方門將。</li>
     <li><b>選棋＋走位</b>：點選發光的棋子，再點亮起的格子。一般走法須走滿點數，一步＝一個相鄰六角格，同一路徑不重複走格。</li>
     <li><b>正面封堵</b>：緊貼出發棋子的敵棋不能直接穿越（需繞行）；離出發棋子 ≥2 格的敵棋可以穿過。</li></ul>
     <h3>搶斷</h3>
@@ -449,6 +455,16 @@ function occ(S) { const a = new Int16Array(cells.length).fill(-1); for (const p 
 const ev = (S, e) => S.ev.push(e);
 const toast = (S, text) => ev(S, { t: 'toast', text });
 const note = (S, team, text) => ev(S, { t: 'note', team, text });
+const _hd = {};
+function hexFrom(c) { if (_hd[c]) return _hd[c]; const d = new Int16Array(cells.length).fill(-1); d[c] = 0; const q = [c]; for (let i = 0; i < q.length; i++) for (const n of cells[q[i]].nb) if (d[n] < 0) { d[n] = d[q[i]] + 1; q.push(n); } return (_hd[c] = d); }
+const BALL_DIST = [5, 9, 13];
+const ballTeam = S => (S.ball < 0 ? -1 : S.pieces[S.ball].team);
+function giveBall(S, pid, kind) { S.ball = pid; ev(S, { t: 'ball', to: pid, kind }); }
+function loseBall(S, pid, kind) { if (S.ball !== pid) return false; const t = S.pieces[pid].team; giveBall(S, (1 - t) * 11, kind || 'lost'); note(S, 1 - t, '⚽ 足球回到你方門將'); return true; }
+function passTargets(S, n) {
+  const H = S.pieces[S.ball], d = hexFrom(H.cell);
+  return S.pieces.filter(p => p.team === H.team && p.id !== H.id && p.cell >= 0 && d[p.cell] <= n).map(p => p.id);
+}
 const areaOf = c => [c].concat(cells[c].nb);
 const inArea = (S, k, cell) => S.fx.some(f => f.k === k && f.cells.indexOf(cell) >= 0);
 const noQA = (S, team) => S.fx.some(f => f.k === 'noqa' && f.team === team);
@@ -484,7 +500,7 @@ function newState(cfg) {
     v: 1, seq: 0, goals: cfg.goals || 3, phase: 'setup', turn: 0, ctrl: 0,
     score: [0, 0], pieces: [], decks: {}, queue: [], cur: null, bonus: [0, 0], ev: [],
     winner: -1, setup: { first: 0 }, lastMoved: -1, die: null,
-    local: !!cfg.local, tc: 0, fx: [], peels: [], slip: [0, 0], gkp: [false, false]
+    local: !!cfg.local, ball: -1, tc: 0, fx: [], peels: [], slip: [0, 0], gkp: [false, false]
   };
   for (let t = 0; t < 2; t++)
     for (let i = 0; i < 11; i++) S.pieces.push({ id: t * 11 + i, team: t, gk: i === 0, cell: i === 0 ? HOME[t] : -1, off: 0, stun: 0 });
@@ -532,14 +548,14 @@ function reach(S, pid, task, occA) {
       const Q = S.pieces[o];
       if (Q.team === t) {
         if (forced || isQA(S, cell) || k - N >= MAXB) return; // 疊人加步；己方占住的快攻點不能當接力站
-        if (C.gp === t) add('goal', -1);
+        if (C.gp === t && S.ball === pid) add('goal', -1);
         for (const n of C.nb) { if (vis[n] || blk[n]) continue; vis[n] = 1; path.push(n); rec(n, k + 1); path.pop(); vis[n] = 0; }
         return;
       }
       if (!forced && canSteal(S, P, Q, cell, ctx)) add('steal', cell, o);
       return;
     }
-    if (C.gp === t && !forced) add('goal', -1);
+    if (C.gp === t && !forced && S.ball === pid) add('goal', -1);
     for (const n of C.nb) {
       if (vis[n] || blk[n]) continue;
       if (k === 0 && N > 1) { const o = occA[n]; if (o >= 0 && S.pieces[o].team !== t) continue; } // 正面封堵
@@ -649,6 +665,17 @@ function runTask(S, t) {
       const ok = S.pieces.some(p => p.team === t.victim && !p.gk && p.cell >= 0);
       if (!ok) break; setCur(S, t, t.chooser); break;
     }
+    case 'pass': {
+      if (ballTeam(S) !== t.team) { toast(S, '足球不在己方，傳球骰略過'); break; }
+      const tg = passTargets(S, t.n);
+      if (!tg.length) {
+        const H = S.pieces[S.ball], d = hexFrom(H.cell), opp = S.pieces.filter(p => p.team !== H.team && p.cell >= 0).sort((a, b) => d[a.cell] - d[b.cell])[0];
+        note(S, H.team, `⚽ ${t.n} 格內沒有隊友：球被傳丟了！`);
+        if (opp) { ev(S, { t: 'pass', from: H.id, to: opp.id, fail: true }); giveBall(S, opp.id, 'fumble'); note(S, opp.team, '⚽ 撿到對手傳丟的球'); }
+        break;
+      }
+      setCur(S, t, t.team); break;
+    }
     case 'area': setCur(S, t, t.team); break;
     case 'peel': if (!peelCells(S, t.team).length) { toast(S, '沒有可放香蕉皮的格子'); break; } setCur(S, t, t.team); break;
     case 'swap': if (S.pieces.filter(p => !p.gk && p.cell >= 0).length < 2) { toast(S, '場上球員不足，無法互換'); break; } setCur(S, t, t.team); break;
@@ -683,6 +710,7 @@ function applyJump(S, task, tg) {
   const rest = [];
   if (tg.kind === 'steal') {
     const V = S.pieces[tg.victim]; V.cell = -1;
+    if (S.ball === V.id) giveBall(S, P.id, 'steal');
     ev(S, { t: 'steal', pid: V.id }); note(S, V.team, '🛡 球員被搶斷：返回己方綠格');
     rest.push({ k: 'respawn', team: V.team, pid: V.id, reason: 'steal' });
   }
@@ -717,10 +745,11 @@ function applyMove(S, task, pid, oc) {
   if (oc.kind === 'goal') {
     P.cell = -1;
     const over = scoreGoal(S, P.team);
-    if (!over) { q.push({ k: 'respawn', team: P.team, pid, reason: 'goal' }); note(S, P.team, '⚽ 進球！球員返回己方綠格'); }
+    if (!over) { giveBall(S, (1 - P.team) * 11, 'goal'); S.bonus[P.team] = 0; q.push({ k: 'respawn', team: P.team, pid, reason: 'goal' }); note(S, P.team, '⚽ 進球！球員返回己方綠格'); note(S, 1 - P.team, '⚽ 足球交給你方門將：換你先攻'); }
   } else {
     if (oc.kind === 'steal') {
       const V = S.pieces[oc.victim]; V.cell = -1;
+      if (S.ball === V.id) { giveBall(S, P.id, 'steal'); note(S, P.team, '⚽ 搶到足球！'); }
       ev(S, { t: 'steal', pid: V.id }); note(S, V.team, '🛡 球員被搶斷：返回己方綠格');
       q.push({ k: 'respawn', team: V.team, pid: V.id, reason: 'steal' });
     }
@@ -749,6 +778,7 @@ function bullRush(S, d) {
   ev(S, { t: 'bull', lanes: lanes.map(L => ({ ids: L.ids, dir: L.dir, hits: L.hits })) });
   for (const pid of hitSet) {
     const P = S.pieces[pid]; P.cell = -1;
+    if (S.ball === pid) loseBall(S, pid, 'lost');
     note(S, P.team, '🐂 被牛撞飛：返回己方綠格重新落點');
     q.push({ k: 'respawn', team: P.team, pid, reason: 'bull' });
   }
@@ -801,7 +831,7 @@ function afterPlace(S, t) {
   const rt = remaining(S, t), ro = remaining(S, 1 - t);
   if (!rt && !ro) {
     const win = ri(0, 1); S.phase = 'play'; S.turn = win; S.ctrl = win; S.queue = [{ k: 'die', team: win }];
-    ev(S, { t: 'coin', purpose: 'kickoff', winner: win });
+    ev(S, { t: 'coin', purpose: 'kickoff', winner: win }); giveBall(S, win * 11, 'kickoff');
     toast(S, `擺陣完成！電腦擲硬幣：${TEAM_NAMES[win]} 先開球`);
   } else S.ctrl = ro ? 1 - t : t;
 }
@@ -837,13 +867,25 @@ function act(S, a, who) {
       for (const id of cs) { const p = nextUnplaced(S, t); if (!p) break; p.cell = id; ev(S, { t: 'place', pid: p.id, cell: id }); }
       afterPlace(S, t); ok = true; break;
     }
-    case 'die': {
-      if (!cur || cur.k !== 'die' || (a.type !== 'att' && a.type !== 'def')) break;
-      const val = a.type === 'att' ? rollAtt() : rollDef(), sl = S.slip[cur.team] === 2 ? 2 : 0, use = Math.max(0, val - sl);
-      S.die = { type: a.type, val, team: cur.team }; ev(S, { t: 'dice', team: cur.team, type: a.type, val });
-      if (sl) note(S, cur.team, `🛢️ 腳滑：步數 ${val} → ${use}`);
-      S.cur = null; S.queue.unshift({ k: 'move', team: cur.team, steps: use, ctx: { kind: 'die', die: a.type, steps: val } });
-      ok = true; break;
+    case 'roll': {
+      if (!cur || cur.k !== 'die' || !Array.isArray(a.dice) || a.dice.length !== 2) break;
+      const ds = a.dice; if (ds[0] === ds[1] || ds.some(x => ['att', 'def', 'ball'].indexOf(x) < 0)) break;
+      if (ds.includes('ball') && ballTeam(S) !== cur.team) break;
+      const order = ['att', 'def', 'ball'].filter(x => ds.includes(x)), sl = S.slip[cur.team] === 2 ? 2 : 0, res = [], tasks = [];
+      for (const k of order) {
+        const val = k === 'att' ? rollAtt() : k === 'def' ? rollDef() : BALL_DIST[ri(0, 2)];
+        res.push({ type: k, val });
+        if (k === 'ball') tasks.push({ k: 'pass', team: cur.team, n: val });
+        else { const use = Math.max(0, val - sl); tasks.push({ k: 'move', team: cur.team, steps: use, ctx: { kind: 'die', die: k, steps: val } }); if (sl) note(S, cur.team, `🛢️ 腳滑：${k === 'att' ? '進攻' : '防守'}骰 ${val} → ${use}`); }
+      }
+      S.die = { dice: res, team: cur.team }; ev(S, { t: 'rolls', team: cur.team, dice: res });
+      S.cur = null; S.queue.unshift(...tasks); ok = true; break;
+    }
+    case 'pass': {
+      if (!cur || cur.k !== 'pass') break;
+      if (!passTargets(S, cur.n).includes(a.to)) break;
+      const from = S.ball; ev(S, { t: 'pass', from, to: a.to }); giveBall(S, a.to, 'pass');
+      S.cur = null; ok = true; break;
     }
     case 'move': {
       if (!cur || cur.k !== 'move') break;
@@ -876,7 +918,7 @@ function act(S, a, who) {
     case 'sendoff': {
       if (!cur || cur.k !== 'sendoff') break;
       const P = S.pieces[a.pid]; if (!P || P.team !== cur.victim || P.gk || P.cell < 0) break;
-      P.cell = -1; P.off = 2; ev(S, { t: 'send', pid: P.id }); note(S, P.team, '🟥 球員被紅牌罰下：缺席 2 回合'); toast(S, `${TEAM_NAMES[P.team]} 一名球員被罰下，缺席 2 回合`);
+      P.cell = -1; P.off = 2; loseBall(S, P.id, 'lost'); ev(S, { t: 'send', pid: P.id }); note(S, P.team, '🟥 球員被紅牌罰下：缺席 2 回合'); toast(S, `${TEAM_NAMES[P.team]} 一名球員被罰下，缺席 2 回合`);
       S.cur = null; ok = true; break;
     }
     case 'fj': {
@@ -903,7 +945,9 @@ function act(S, a, who) {
       const A = S.pieces[a.a], B = S.pieces[a.b];
       if (!A || !B || A.id === B.id || A.gk || B.gk || A.cell < 0 || B.cell < 0) break;
       const ca = A.cell, cb = B.cell; A.cell = cb; B.cell = ca;
-      ev(S, { t: 'swap', a: A.id, b: B.id, ca, cb }); S.cur = null; ok = true; break;
+      ev(S, { t: 'swap', a: A.id, b: B.id, ca, cb });
+      if (S.ball === A.id) loseBall(S, A.id, 'lost'); else if (S.ball === B.id) loseBall(S, B.id, 'lost');
+      S.cur = null; ok = true; break;
     }
     case 'gkskill': {
       if (!cur || cur.k !== 'die' || !S.gkp[cur.team]) break;
@@ -929,7 +973,13 @@ function autoAction(S, strat) {
   const c = S.cur; if (!c) return null;
   const pick = arr => arr[ri(0, arr.length - 1)];
   switch (c.k) {
-    case 'die': if (S.gkp[c.team] && S.pieces[c.team * 11].cell >= 0 && Math.random() < .5) return { t: 'gkskill' }; return { t: 'die', type: Math.random() < (smart ? 0.6 : 0.5) ? 'att' : 'def' };
+    case 'die': {
+      if (S.gkp[c.team] && S.pieces[c.team * 11].cell >= 0 && Math.random() < .5) return { t: 'gkskill' };
+      const own = ballTeam(S) === c.team;
+      if (own && Math.random() < (smart ? .6 : .5)) return { t: 'roll', dice: [Math.random() < .5 ? 'att' : 'def', 'ball'] };
+      return { t: 'roll', dice: ['att', 'def'] };
+    }
+    case 'pass': { const tg = passTargets(S, c.n).map(i => S.pieces[i]); tg.sort((a, b) => progress(c.team, b.cell) - progress(c.team, a.cell)); return { t: 'pass', to: (smart ? (Math.random() < .8 ? tg[0] : pick(tg)) : pick(tg)).id }; }
     case 'move': {
       const m = movable(S, c); let best = null, bv = -1e9;
       for (const pid of Object.keys(m)) {
@@ -940,8 +990,8 @@ function autoAction(S, strat) {
           if (!smart) v = Math.random();
           else if (forced) v = (p0 - pr) + p0 * 0.3 + Math.random() * 3;
           else {
-            v = (pr - p0) * 2 + Math.random() * 4;
-            if (o.kind === 'goal') v += 10000; else if (o.kind === 'steal') v += 200 + (p.team === 0 ? 34 - cells[o.to].c : cells[o.to].c) * 0.5;
+            v = (pr - p0) * 2 + Math.random() * 4; if (p.id === S.ball) v += (pr - p0) * 1.5;
+            if (o.kind === 'goal') v += 10000; else if (o.kind === 'steal') v += (S.pieces[o.victim] && S.ball === o.victim ? 400 : 0) + 200 + (p.team === 0 ? 34 - cells[o.to].c : cells[o.to].c) * 0.5;
             if (p.gk) v -= 60;
             if (cells[o.to] && cells[o.to].ev && cells[o.to].side === 1 - p.team) v += 8;
           }
@@ -972,7 +1022,7 @@ function autoAction(S, strat) {
 }
 
 const E = { cells, cid, DARK, genQA, isQA, HOME, GP, CARDS, KINDS, TEAM_NAMES, FORMATIONS, COLS, MID, SQ3,
-  newState, act, advance, reach, areaOf, areaCenters, peelCells, blockedSet, inArea, noQA, gkLocked, FX_DUR, movable, occ, respawnCells, jumpTargets, autoAction, progress, remaining, canSteal };
+  newState, act, advance, reach, hexFrom, passTargets, ballTeam, BALL_DIST, areaOf, areaCenters, peelCells, blockedSet, inArea, noQA, gkLocked, FX_DUR, movable, occ, respawnCells, jumpTargets, autoAction, progress, remaining, canSteal };
 if (typeof module !== 'undefined' && module.exports) module.exports = E; else G.OG = E;
 })(typeof window !== 'undefined' ? window : globalThis);
 
@@ -1061,6 +1111,7 @@ function stopMusic() { if (sched) clearInterval(sched); sched = null; trackName 
 /* --- 音效 --- */
 const fan = (t, notes, v) => notes.forEach(([m, dt, d]) => brass(t + dt, m, d, v || 1, sg));
 const SFX = {
+  kick(t) { osc('sine', 200, t, .12, .7, sg, { to: 60 }); noise(t, .08, .5, 'lowpass', 1400, sg); noise(t + .05, .55, .3, 'bandpass', 700, sg, { to: 2600, q: 1.2, a: .08 }); },
   bull(t) { osc('sawtooth', 120, t, .5, .35, sg, { to: 70, lp: 600 }); for (let i = 0; i < 8; i++) noise(t + i * .09, .06, .32, 'lowpass', 450, sg); osc('sawtooth', 190, t + .45, .7, .3, sg, { to: 110, lp: 700 }); },
   bump(t) { noise(t, .12, .5, 'lowpass', 900, sg); osc('sine', 180, t, .2, .5, sg, { to: 60 }); },
   slip(t) { osc('sine', 950, t, .35, .35, sg, { to: 200 }); osc('triangle', 500, t + .05, .3, .25, sg, { to: 900 }); noise(t + .32, .1, .3, 'lowpass', 500, sg); },
@@ -1594,6 +1645,73 @@ async function slipEvent(e) {
   m.inner.rotation.z = 0; m.g.position.y = .12; m.busy = false;
 }
 
+/* ---------- 足球 ---------- */
+let ballMesh = null, ballHolder = -1, ballFly = false, ballShadow = null, ballLastT = 0;
+function ballTex() {
+  return canvasTex(512, 256, (g) => {
+    g.fillStyle = '#fff'; g.fillRect(0, 0, 512, 256); g.fillStyle = '#161616';
+    const pent = (cx, cy, r) => { g.beginPath(); for (let i = 0; i < 5; i++) { const a = -Math.PI / 2 + i * 2 * Math.PI / 5; g.lineTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r); } g.closePath(); g.fill(); };
+    for (let i = 0; i < 6; i++) { pent(40 + i * 86, 70, 24); pent(83 + i * 86, 185, 24); }
+    g.fillRect(0, 0, 512, 10); g.fillRect(0, 246, 512, 10);
+  });
+}
+function makeBallMesh() {
+  const m = new THREE.Mesh(new THREE.SphereGeometry(.34, 20, 14), new THREE.MeshLambertMaterial({ map: ballTex() })); m.castShadow = true; m.visible = false; scene.add(m);
+  ballShadow = new THREE.Mesh(new THREE.CircleGeometry(.32, 16), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: .35, depthWrite: false })); ballShadow.rotation.x = -Math.PI / 2; ballShadow.visible = false; scene.add(ballShadow);
+  ballMesh = m;
+}
+function ballTick(t) {
+  if (!ballMesh) return; const dt = Math.min(.1, t - ballLastT); ballLastT = t;
+  if (ballFly) return;
+  if (ballHolder < 0) { ballMesh.visible = false; ballShadow.visible = false; return; }
+  const m = pm[ballHolder]; if (!m || !m.g.visible) { return; }
+  const dir = ballHolder < 11 ? 1 : -1, ph = t * 5.5 + ballHolder;
+  // 腳下盤球：在腳前一小段距離彈跳、來回滾動
+  const bx = m.g.position.x + dir * (.78 + .12 * Math.sin(ph)), bz = m.g.position.z + .22 * Math.sin(ph * .5), by = m.g.position.y + .34 + Math.abs(Math.sin(ph)) * .26;
+  ballMesh.visible = true; ballMesh.position.set(bx, by, bz); ballMesh.rotation.z -= dir * dt * 9; ballMesh.rotation.x += dt * 3;
+  ballShadow.visible = true; ballShadow.position.set(bx, .17, bz); ballShadow.scale.setScalar(1 - (by - m.g.position.y - .34) * .8);
+}
+const trailPool = [];
+async function ballFlight(e, S, high) {
+  const toP = S.pieces[e.to], dir = e.to < 11 ? 1 : -1; if (!ballMesh) return;
+  const tc = toP.cell >= 0 ? cellXZ(toP.cell) : { x: ballMesh.position.x, z: ballMesh.position.z };
+  const A = ballMesh.position.clone(), B = new THREE.Vector3(tc.x + dir * .78, .38, tc.z);
+  const dist = Math.hypot(B.x - A.x, B.z - A.z), dur = Math.min(1.6, Math.max(.55, dist / 20 + .35)), H = Math.max(2.2, Math.min(high ? 11 : 8.5, dist * (high ? .42 : .3)));
+  ballFly = true; ballMesh.visible = true; ballShadow.visible = true;
+  // 傳球軌跡：地面光線 + 殘影
+  const ang = Math.atan2(B.z - A.z, B.x - A.x);
+  const line = new THREE.Mesh(new THREE.PlaneGeometry(1, .34), new THREE.MeshBasicMaterial({ color: 0xfff2a8, transparent: true, opacity: .75, blending: THREE.AdditiveBlending, depthWrite: false }));
+  line.rotation.x = -Math.PI / 2; line.rotation.z = ang; line.position.set(A.x, .19, A.z); line.renderOrder = 4; scene.add(line);
+  const trail = []; for (let i = 0; i < 12; i++) { const sp = new THREE.Mesh(new THREE.SphereGeometry(.28 * (1 - i / 16), 8, 6), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: .5 * (1 - i / 12), blending: THREE.AdditiveBlending, depthWrite: false })); sp.visible = false; scene.add(sp); trail.push(sp); }
+  const hist = [];
+  // 傳球者踢球動作
+  const from = pm[e.from !== undefined ? e.from : ballHolder];
+  if (from && from.g.visible) tween(.3, (u) => { from.inner.rotation.z = -dir * Math.sin(u * Math.PI) * .45; }, t => t).then(() => { from.inner.rotation.z = 0; });
+  await sleep(120);
+  await tween(dur, (u) => {
+    const x = lerp(A.x, B.x, u), z = lerp(A.z, B.z, u), y = lerp(A.y, B.y, u) + Math.sin(u * Math.PI) * H;
+    ballMesh.position.set(x, y, z); ballMesh.rotation.x += .5; ballMesh.rotation.z -= dir * .6;
+    ballShadow.position.set(x, .17, z); ballShadow.scale.setScalar(Math.max(.35, 1 - Math.sin(u * Math.PI) * .55));
+    hist.unshift({ x, y, z }); if (hist.length > 40) hist.pop();
+    trail.forEach((sp, i) => { const h = hist[(i + 1) * 2]; if (h) { sp.visible = true; sp.position.set(h.x, h.y, h.z); } });
+    const len = Math.max(.01, Math.hypot(x - A.x, z - A.z)); line.scale.x = len; line.position.set((A.x + x) / 2, .19, (A.z + z) / 2); line.material.opacity = .75 * (1 - u * .3);
+  }, t => t);
+  ballMesh.position.copy(B); ballHolder = e.to; ballFly = false;
+  // 落點特效：擴散光環 + 小彈跳
+  const ring = new THREE.Mesh(new THREE.RingGeometry(.4, .62, 28), new THREE.MeshBasicMaterial({ color: 0xffffaa, transparent: true, opacity: .9, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false }));
+  ring.rotation.x = -Math.PI / 2; ring.position.set(B.x, .2, B.z); scene.add(ring);
+  tween(.6, (u) => { ring.scale.setScalar(1 + u * 3.2); ring.material.opacity = .9 * (1 - u); line.material.opacity = .5 * (1 - u); trail.forEach(sp => { sp.material.opacity *= .85; }); }, easeOut).then(() => {
+    scene.remove(ring, line); ring.geometry.dispose(); ring.material.dispose(); line.geometry.dispose(); line.material.dispose(); trail.forEach(sp => { scene.remove(sp); sp.geometry.dispose(); sp.material.dispose(); });
+  });
+  const to = pm[e.to]; if (to && to.g.visible) tween(.35, (u) => { to.inner.position.y = Math.sin(u * Math.PI) * .22; }, t => t).then(() => { to.inner.position.y = 0; });
+}
+async function ballEvent(e, S) {
+  if (!ballMesh) return;
+  if (e.kind === 'pass' || e.kind === 'fumble') { return; } // 動畫由 pass 事件負責
+  if (e.kind === 'steal') { ballHolder = e.to; popEmoji('⚽', ballMesh.position.x, ballMesh.position.z, 1.6); return; }
+  if (e.kind === 'kickoff') { ballHolder = e.to; return; }
+  await ballFlight({ to: e.to }, S, true); // 進球 / 失球：高吊回對方門將
+}
 /* ---------- 棋子 ---------- */
 const SKIN = [0xf6d0b0, 0xe0a97a, 0xc58a5a, 0x8d5a3a], HAIR = [0x2a1a10, 0x5a3a20, 0x111111, 0xc9a050, 0x8a3a1a, 0xaaaaaa];
 const matCache = {}; const M = (c) => matCache[c] || (matCache[c] = lam(c));
@@ -1629,7 +1747,7 @@ function cellXZ(i) { return { x: cells[i].x, z: cells[i].z }; }
 function placeMesh(pm_, cell) { if (cell < 0) { pm_.g.visible = false; pm_.cell = -1; return; } const p = cellXZ(cell); pm_.g.position.set(p.x, .12, p.z); pm_.g.visible = true; pm_.g.scale.setScalar(1); pm_.cell = cell; }
 
 /* ---------- 骰子 / 卡牌 ---------- */
-const DIE_FACES = { att: [4, 6, 5, 5, 6, 4], def: [1, 3, 2, 2, 3, 1] };
+const DIE_FACES = { att: [4, 6, 5, 5, 6, 4], def: [1, 3, 2, 2, 3, 1], ball: [5, 13, 9, 9, 13, 5] };
 function dieFaceTex(n, bg) {
   return canvasTex(256, 256, (g) => {
     g.fillStyle = bg; g.fillRect(0, 0, 256, 256); g.strokeStyle = 'rgba(0,0,0,.25)'; g.lineWidth = 14; g.strokeRect(7, 7, 242, 242);
@@ -1637,9 +1755,16 @@ function dieFaceTex(n, bg) {
     g.strokeText(String(n), 128, 140); g.fillText(String(n), 128, 140);
   });
 }
+function ballFaceTex(n) {
+  return canvasTex(256, 256, (g) => {
+    for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) { g.fillStyle = (i + j) % 2 ? '#111' : '#fff'; g.fillRect(i * 64, j * 64, 64, 64); }
+    g.fillStyle = '#fff'; g.beginPath(); g.arc(128, 128, 78, 0, 6.2832); g.fill(); g.lineWidth = 10; g.strokeStyle = '#111'; g.stroke();
+    g.fillStyle = '#111'; g.font = '900 ' + (n > 9 ? 96 : 120) + 'px "Noto Sans TC",Arial,sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(String(n), 128, 136);
+  });
+}
 function makeDie(type) {
   const bg = type === 'att' ? '#e8721f' : '#2c8fe0';
-  const mats = DIE_FACES[type].map(n => new THREE.MeshLambertMaterial({ map: dieFaceTex(n, bg) }));
+  const mats = DIE_FACES[type].map(n => type === 'ball' ? new THREE.MeshLambertMaterial({ map: ballFaceTex(n) }) : new THREE.MeshLambertMaterial({ map: dieFaceTex(n, bg) }));
   const m = new THREE.Mesh(new THREE.BoxGeometry(1.5, 1.5, 1.5), mats); m.castShadow = true; m.visible = false; scene.add(m); return m;
 }
 const FACE_Q = (() => {
@@ -1648,14 +1773,14 @@ const FACE_Q = (() => {
 })();
 const DIE_REST = { att: { x: -1.6, z: 0 }, def: { x: 1.6, z: 0 } };
 let diceTimer = 0;
-function fadeDice() { for (const k of ['att', 'def']) { const d = dice[k]; if (!d.visible) continue; tween(.3, (u) => d.scale.setScalar(1 - u)).then(() => { d.visible = false; d.scale.setScalar(1); }); } }
-async function rollDie(type, val, from, single) {
+function fadeDice() { for (const k of ['att', 'def', 'ball']) { const d = dice[k]; if (!d.visible) continue; tween(.3, (u) => d.scale.setScalar(1 - u)).then(() => { d.visible = false; d.scale.setScalar(1); }); } }
+async function rollDie(type, val, from, single, restX) {
   const d = dice[type]; clearTimeout(diceTimer); d.visible = true; d.scale.setScalar(1);
   const faces = DIE_FACES[type]; const fi = faces.indexOf(val);
   const yaw = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.random() * Math.PI * 2);
   const qEnd = yaw.multiply(FACE_Q[fi]);
   const axis = new THREE.Vector3(Math.random() - .5, Math.random() - .5, Math.random() - .5).normalize();
-  const spins = 3 + Math.random() * 2, rest = single ? { x: 0, z: 0 } : DIE_REST[type], sx = (from && from.x !== undefined) ? from.x : rest.x, sz = (from && from.z !== undefined) ? from.z : rest.z;
+  const spins = 3 + Math.random() * 2, rest = restX !== undefined ? { x: restX, z: 0 } : single ? { x: 0, z: 0 } : DIE_REST[type], sx = (from && from.x !== undefined) ? from.x : rest.x, sz = (from && from.z !== undefined) ? from.z : rest.z;
   const mid = { x: lerp(sx, 0, .55) + (Math.random() - .5) * 5, z: lerp(sz, 0, .55) + (Math.random() - .5) * 4 };
   await tween(1.15, (u) => {
     const x = u < .6 ? lerp(sx, mid.x, u / .6) : lerp(mid.x, rest.x, (u - .6) / .4), z = u < .6 ? lerp(sz, mid.z, u / .6) : lerp(mid.z, rest.z, (u - .6) / .4);
@@ -1853,14 +1978,14 @@ function init(cv) {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2)); renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   scene = new THREE.Scene(); scene.background = new THREE.Color(0x9ccdfa); scene.fog = new THREE.Fog(0xcfe6ff, 170, 470);
   camera = new THREE.PerspectiveCamera(42, 1, .5, 900);
-  buildWorld(); buildQA(); buildDecks(); dice.att = makeDie('att'); dice.def = makeDie('def'); coin = makeCoin();
+  buildWorld(); buildQA(); makeBallMesh(); buildDecks(); dice.att = makeDie('att'); dice.def = makeDie('def'); dice.ball = makeDie('ball'); coin = makeCoin();
   for (let i = 0; i < 22; i++) { const p = makePiece({ id: i, team: i < 11 ? 0 : 1, gk: i % 11 === 0 }); pm.push(p); scene.add(p.g); p.g.visible = false; }
   initControls(); window.addEventListener('resize', resize); resize();
   cam.user = false; preset('tactic', true);
   let last = performance.now();
   renderer.setAnimationLoop(() => {
     const now = performance.now(), dt = Math.min(.1, (now - last) / 1000); last = now; tNow = now / 1000;
-    tick(now); keyStep(dt); envTick(dt); crowdTick(dt, tNow); qaTick(tNow); fxTick(tNow);
+    tick(now); keyStep(dt); envTick(dt); crowdTick(dt, tNow); qaTick(tNow); fxTick(tNow); ballTick(tNow);
     hlMesh.material.opacity = .42 + .2 * Math.sin(tNow * 5);
     for (const p of pm) if (p.ring.visible) { p.ring.material.opacity = .6 + .4 * Math.sin(tNow * 6 + p.pid); p.ring.scale.setScalar(1 + .06 * Math.sin(tNow * 6)); }
     for (const t of [0, 1]) if (goalGlow[t].visible) goalGlow[t].material.opacity = .35 + .3 * Math.sin(tNow * 6);
@@ -1885,14 +2010,16 @@ function sync(S) {
   if (S.qa) setQA(S.qa, false);
   for (const P of S.pieces) { const m = pm[P.id]; if (m.busy) continue; placeMesh(m, P.cell); if (P.cell >= 0) m.inner.position.y = 0; }
   syncFx(S, false);
+  if (!ballFly) ballHolder = S.ball === undefined ? -1 : S.ball;
 }
-function resetAll() { fxSig = ''; if (fxRoot) { scene.remove(fxRoot); fxRoot = null; fxAnim = []; } for (const m of pm) { m.busy = false; m.g.visible = false; m.cell = -1; if (m.dizzy) m.dizzy.visible = false; } dice.att.visible = false; dice.def.visible = false; if (coin) coin.visible = false; setHighlights([]); setPick(new Set(), -1); setGoalGlow(-1); }
+function resetAll() { ballHolder = -1; ballFly = false; if (ballMesh) { ballMesh.visible = false; ballShadow.visible = false; } fxSig = ''; if (fxRoot) { scene.remove(fxRoot); fxRoot = null; fxAnim = []; } for (const m of pm) { m.busy = false; m.g.visible = false; m.cell = -1; if (m.dizzy) m.dizzy.visible = false; } dice.att.visible = false; dice.def.visible = false; dice.ball.visible = false; if (coin) coin.visible = false; setHighlights([]); setPick(new Set(), -1); setGoalGlow(-1); }
 function sideFrom(team) { return { x: team === 0 ? -14 : 14, z: 15.2 }; }
 
 async function hop(m, a, b, dur, h, idx) { m.busy = true; if (typeof SND !== 'undefined') SND.sfx('hop', idx || 0); await tween(dur, (u) => { m.g.position.set(lerp(a.x, b.x, u), .12 + Math.sin(u * Math.PI) * h, lerp(a.z, b.z, u)); }, t => t); }
 async function playEvent(e, S) {
   switch (e.t) {
     case 'dice': await rollDie(e.type, e.val, sideFrom(e.team), true); break;
+    case 'rolls': await Promise.all(e.dice.map((d, i) => rollDie(d.type, d.val, sideFrom(e.team), false, e.dice.length === 1 ? 0 : (i ? 1.7 : -1.7)))); break;
     case 'dice2': await Promise.all([rollDie('att', e.a, sideFrom(e.team)), rollDie('def', e.d, sideFrom(e.team))]); break;
     case 'pk': await Promise.all([rollDie('att', e.a[0], sideFrom(e.team)), rollDie('def', e.a[1], sideFrom(e.team))]); await sleep(900);
       await Promise.all([rollDie('att', e.d[0], sideFrom(1 - e.team)), rollDie('def', e.d[1], sideFrom(1 - e.team))]); break;
@@ -1920,6 +2047,8 @@ async function playEvent(e, S) {
     case 'qa': setQA(e.cells, true); break;
     case 'card': await flyCard(E.CARDS[e.id]); break;
     case 'goal': break;
+    case 'pass': await ballFlight({ from: e.from, to: e.to }, S, false); if (e.fail) { popEmoji('💢', ballMesh.position.x, ballMesh.position.z, 2); } break;
+    case 'ball': await ballEvent(e, S); break;
     case 'fx': syncFx(S, true); break;
     case 'fxend': syncFx(S, false); break;
     case 'peel': if (e.team === peelView) { const q = cellXZ(e.cell); popEmoji('🍌', q.x, q.z, 1.8); } syncFx(S, true); break;
@@ -1935,7 +2064,7 @@ return { setPeelView: t => { peelView = t; fxSig = ''; }, init, sync, setQA, pla
 (function () {
 'use strict';
 const E = window.OG, $ = id => document.getElementById(id), TN = E.TEAM_NAMES;
-let S = null, cfg = { mode: 'ai', myTeam: 0, goals: 3, aiTeam: 1 }, busy = false, sel = -1, fjSel = -1, areaSel = -1, swapSel = [], gen = 0, pending = null, autoFlip = false, lastCard = null, goalsSetting = 3;
+let S = null, cfg = { mode: 'ai', myTeam: 0, goals: 3, aiTeam: 1 }, busy = false, sel = -1, fjSel = -1, areaSel = -1, swapSel = [], diceSel = [], gen = 0, pending = null, autoFlip = false, lastCard = null, goalsSetting = 3;
 let mvKey = null, mvVal = null, lastPrKey = '';
 const myId = Math.random().toString(36).slice(2, 10);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -1983,7 +2112,7 @@ const pieceAt = cell => S.pieces.find(p => p.cell === cell);
 
 /* ---------- 開局 ---------- */
 function startGame(mode, o) {
-  gen++; pending = null; busy = true; sel = -1; fjSel = -1; areaSel = -1; swapSel = []; lastCard = null;
+  gen++; pending = null; busy = true; sel = -1; fjSel = -1; areaSel = -1; swapSel = []; diceSel = []; lastCard = null;
   cfg = { mode, myTeam: o.myTeam || 0, goals: o.goals || goalsSetting, aiTeam: 1 };
   S = o.state || E.newState({ goals: cfg.goals, local: cfg.mode === 'local' });
   const g = gen;
@@ -2022,6 +2151,9 @@ async function playEvents(evs) {
       switch (e.t) {
         case 'toast': log(e.text); await sleep(180); break;
         case 'turn': if (S.phase === 'play') SND.sfx('turn'); if (autoFlip && cfg.mode === 'local') { V.setMyTeam(e.team); V.preset('tactic'); } break;
+        case 'rolls': log(`${TN[e.team]} 擲 ` + e.dice.map(d => ({ att: '進攻骰', def: '防守骰', ball: '足球骰' }[d.type]) + ' ' + d.val).join('、')); SND.sfx('dice'); await V.playEvent(e, S); break;
+        case 'pass': log(e.fail ? '⚽ 傳球失誤，球被對手撿走' : `⚽ 傳球：${pname(e.from)} → ${pname(e.to)}`); SND.sfx('kick'); await V.playEvent(e, S); SND.sfx(e.fail ? 'bad' : 'select'); break;
+        case 'ball': if (e.kind === 'steal') SND.sfx('steal'); await V.playEvent(e, S); break;
         case 'dice': log(`${TN[e.team]} 擲 ${e.type === 'att' ? '進攻骰' : '防守骰'}：${e.val}`); SND.sfx('dice'); await V.playEvent(e, S); break;
         case 'coin': {
           const what = e.purpose === 'setup' ? '先擺棋' : '先開球'; log(`硬幣決定：${TN[e.winner]} ${what}`);
@@ -2056,7 +2188,7 @@ async function playEvents(evs) {
   } catch (err) { console.error(err); }
   if (g !== gen) return;
   V.sync(S); busy = false;
-  if (pending) { const p = pending; pending = null; S = p; sel = -1; fjSel = -1; areaSel = -1; swapSel = []; playEvents(S.ev); return; }
+  if (pending) { const p = pending; pending = null; S = p; sel = -1; fjSel = -1; areaSel = -1; swapSel = []; diceSel = []; playEvents(S.ev); return; }
   renderUI();
   if (S.phase === 'over') { showOver(); return; }
   maybeAI();
@@ -2065,7 +2197,7 @@ function doAct(a) {
   if (busy || !S) return false;
   const ok = E.act(S, a, S.ctrl);
   if (!ok) { log('這個動作不合法'); return false; }
-  sel = -1; fjSel = -1; areaSel = -1; swapSel = [];
+  sel = -1; fjSel = -1; areaSel = -1; swapSel = []; diceSel = [];
   if (cfg.mode === 'online') netSend({ t: 'state', st: S });
   playEvents(S.ev); return true;
 }
@@ -2104,10 +2236,23 @@ function renderUI() {
     if (!mine) pr = waitTxt();
     else switch (cur.k) {
       case 'die': {
-        pr = `${tag(c)} <b>選擇骰子</b>：進攻骰長距離、防守骰短程與己方半場搶斷`;
-        btns = [{ html: '進攻骰 4 · 5 · 6<small>長程；只能在對方半場/中線搶斷</small>', cls: 'att', fn: () => doAct({ t: 'die', type: 'att' }) },
-          { html: '防守骰 1 · 2 · 3<small>短程；全場可搶斷、門將搶斷</small>', cls: 'def', fn: () => doAct({ t: 'die', type: 'def' }) }];
+        const hasBall = E.ballTeam(S) === cur.team;
+        diceSel = diceSel.filter(k => k !== 'ball' || hasBall);
+        const tg = (k, html, cls, dis) => ({ html: (diceSel.includes(k) ? '✔ ' : '') + html, cls: cls + (diceSel.includes(k) ? ' picked' : ''), dis, fn: () => { const i = diceSel.indexOf(k); if (i >= 0) diceSel.splice(i, 1); else { if (diceSel.length >= 2) diceSel.shift(); diceSel.push(k); } SND.sfx('select'); renderUI(); } });
+        pr = `${tag(c)} <b>3 顆骰子自選 2 顆</b>（結算順序：進攻 → 防守 → 足球）<br>已選 ${diceSel.length}/2` + (hasBall ? '' : '　<small>足球不在己方，足球骰不能選</small>');
+        btns = [tg('att', '進攻骰 4·5·6<small>長程；對方半場/中線搶斷</small>', 'att'),
+          tg('def', '防守骰 1·2·3<small>短程；全場可搶斷</small>', 'def'),
+          tg('ball', '⚽ 足球骰 5·9·13<small>持球者傳球距離（格）</small>', 'ball', !hasBall),
+          { html: '🎲 擲骰', cls: 'pri', dis: diceSel.length !== 2, fn: () => { const d = diceSel.slice(); diceSel = []; doAct({ t: 'roll', dice: d }); } }];
         if (S.gkp[cur.team] && S.pieces[cur.team * 11].cell >= 0) btns.unshift({ html: '🛡️ 發動門將威能<small>門將腳下與左右 3 格靈壓牆 2 回合（不耗回合）</small>', cls: 'pri', fn: () => doAct({ t: 'gkskill' }) });
+        break;
+      }
+      case 'pass': {
+        const tg = E.passTargets(S, cur.n), H = S.pieces[S.ball];
+        pr = `${tag(c)} ⚽ 足球骰 <b>${cur.n}</b>：點選 ${cur.n} 格內發光的<b>隊友</b>傳球（${pname(H.id)} 持球）`;
+        for (const id of tg) pick.add(id);
+        hl.push({ cell: H.cell, kind: 'goal' });
+        for (const id of tg) hl.push({ cell: S.pieces[id].cell, kind: 'move' });
         break;
       }
       case 'move': {
@@ -2194,6 +2339,7 @@ function renderUI() {
 }
 function renderFxHud() {
   const el = $('fxHud'); if (!el) return; const L = [];
+  if (S.ball >= 0) { const bp = S.pieces[S.ball]; L.push(`⚽ 持球：${TN[bp.team]} ${pname(bp.id)}`); }
   const NM = { flood: '💦 淹水區', nosteal: '🕊️ 和平令', oil: '🛢️ 沙拉油區', barrier: '🛡️ 靈壓牆', noqa: '🚫 結界失效' };
   for (const f of S.fx || []) L.push(`${NM[f.k]}${(f.k === 'barrier' || f.k === 'noqa') ? '（' + TN[f.team] + '）' : ''} 剩 ${Math.ceil(f.left / 2)} 回合`);
   for (const t of [0, 1]) if (S.gkp && S.gkp[t]) L.push(`🛡️ ${TN[t]} 持有門將威能`);
@@ -2221,6 +2367,7 @@ function onTap(cell, goal) {
     case 'area': if (cell >= 0) { if (E.areaCenters(S, cur.fx).includes(cell)) { areaSel = cell; SND.sfx('select'); renderUI(); } else { SND.sfx('error'); log('這裡不能投擲：範圍不可涵蓋雙方深綠格'); } } break;
     case 'peel': if (cell >= 0) { if (E.peelCells(S, cur.team).includes(cell)) doAct({ t: 'peel', cell }); else SND.sfx('error'); } break;
     case 'swap': if (p && !p.gk) { const k = swapSel.indexOf(p.id); if (k >= 0) swapSel.splice(k, 1); else if (swapSel.length < 2) swapSel.push(p.id); SND.sfx('select'); renderUI(); } break;
+    case 'pass': if (p && E.passTargets(S, cur.n).includes(p.id)) doAct({ t: 'pass', to: p.id }); else SND.sfx('error'); break;
     case 'respawn': if (cell >= 0) doAct({ t: 'respawn', cell }); break;
     case 'jump': if (cell >= 0) doAct({ t: 'jump', to: cell }); break;
     case 'gk': if (cell >= 0) doAct({ t: 'gk', cell }); break;
@@ -2337,7 +2484,7 @@ function onNetMsg(m, tr) {
   } else if (m.t === 'state' && S && cfg.mode === 'online') {
     if (m.st.seq <= S.seq) return;
     if (busy) { pending = m.st; return; }
-    S = m.st; sel = -1; fjSel = -1; areaSel = -1; swapSel = []; playEvents(S.ev);
+    S = m.st; sel = -1; fjSel = -1; areaSel = -1; swapSel = []; diceSel = []; playEvents(S.ev);
   }
 }
 function badCode(id, msg) { const e = $(id === 'hostCode' ? 'hostErr' : 'joinErr'); e.textContent = msg; const i = $(id); i.classList.remove('shakeX'); void i.offsetWidth; i.classList.add('shakeX'); SND.sfx('error'); i.focus(); }
@@ -2414,8 +2561,12 @@ function bind() {
   };
   window.addEventListener('keydown', (e) => {
     if (!S || busy || !isMine()) return;
-    if (S.cur && S.cur.k === 'die') { if (e.key === '1') doAct({ t: 'die', type: 'att' }); if (e.key === '2') doAct({ t: 'die', type: 'def' }); }
-    if (e.key === 'Escape' && (sel >= 0 || fjSel >= 0 || areaSel >= 0 || swapSel.length)) { sel = -1; fjSel = -1; areaSel = -1; swapSel = []; renderUI(); }
+    if (S.cur && S.cur.k === 'die') {
+      const k = { '1': 'att', '2': 'def', '3': 'ball' }[e.key];
+      if (k && (k !== 'ball' || E.ballTeam(S) === S.cur.team)) { const i = diceSel.indexOf(k); if (i >= 0) diceSel.splice(i, 1); else { if (diceSel.length >= 2) diceSel.shift(); diceSel.push(k); } SND.sfx('select'); renderUI(); }
+      if (e.key === 'Enter' && diceSel.length === 2) { const d = diceSel.slice(); diceSel = []; doAct({ t: 'roll', dice: d }); }
+    }
+    if (e.key === 'Escape' && (sel >= 0 || fjSel >= 0 || areaSel >= 0 || swapSel.length)) { sel = -1; fjSel = -1; areaSel = -1; swapSel = []; diceSel = []; renderUI(); }
   });
   document.addEventListener('gesturestart', e => e.preventDefault());
   document.addEventListener('dblclick', e => e.preventDefault());
