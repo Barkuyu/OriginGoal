@@ -1101,6 +1101,7 @@ function buildWorld() {
   const adM = new THREE.MeshLambertMaterial({ map: adT, emissive: 0x0a3a25, emissiveMap: adT });
   const ad = (w, d, x, z) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w, 1.2, d), adM); b.position.set(x, .6, z); b.castShadow = true; boardGroup.add(b); };
   ad(60, .5, 0, -16.6); ad(60, .5, 0, 16.6); ad(.5, 34, -29.6, 0); ad(.5, 34, 29.6, 0);
+  buildStands();
   buildEnvironment();
 }
 
