@@ -199,6 +199,11 @@ input[type=range]{width:100%;margin-top:8px;accent-color:#3ac07c;height:28px}
 .note.t1{border-color:#ffd93a;box-shadow:0 6px 22px rgba(0,0,0,.45),0 0 18px rgba(255,217,58,.55)}
 @keyframes noteLife{0%{opacity:0;transform:translate(-50%,16px) scale(.55)}11%{opacity:1;transform:translate(-50%,0) scale(1.06)}16%{transform:translate(-50%,0) scale(1)}88%{opacity:1;transform:translate(-50%,0) scale(1)}100%{opacity:0;transform:translate(-50%,-14px) scale(.85)}}
 
+#fxHud{position:fixed;right:8px;top:calc(env(safe-area-inset-top,0px) + 62px);z-index:6;display:flex;flex-direction:column;align-items:flex-end;gap:4px;pointer-events:none;max-width:60vw}
+#fxHud.hide{display:none}
+#fxHud span{background:rgba(10,40,26,.82);border:1px solid rgba(255,255,255,.25);border-radius:10px;padding:3px 9px;font-size:12px;font-weight:700;color:#fff;width:max-content;max-width:100%}
+.cardBox .cIcon{font-size:54px;line-height:1.1}
+
 </style>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -221,6 +226,7 @@ input[type=range]{width:100%;margin-top:8px;accent-color:#3ac07c;height:28px}
   <button class="ib set" id="btnSet" aria-label="設定">⚙<small>設定</small></button>
 </div>
 
+<div id="fxHud" class="hide"></div>
 <div id="log"></div>
 <div id="netBadge" class="hide"></div>
 <div id="banner"></div>
@@ -325,12 +331,15 @@ input[type=range]{width:100%;margin-top:8px;accent-color:#3ac07c;height:28px}
     <h3>疊人加步</h3><ul><li>走滿點數後終點若是隊友，可再往相鄰格多走一步（可連鎖）。己方占住的快攻點不能當接力站。</li></ul>
     <h3>快攻點（橘色閃光格）</h3><ul><li>每個半場有 4 個快攻點，<b>每個回合開始都會在兩邊隨機重新出現</b>（不會占用深綠格）。落在快攻點會跳到另一個可用快攻點（己方占住的不能選），跳完即停。從對方半場快攻點跳回自己半場快攻點時，可「回跳搶斷」對手。</li></ul>
     <h3>事件卡（紅／黃／藍）</h3>
-    <ul><li>在<b>對方半場</b>的紅、黃、藍事件格停下（含搶斷後），可選擇抽同色牌。紅約 75% 有利、黃約 66%、藍約 50%。</li>
-    <li>獎勵由抽牌方操作自己的棋子；懲罰由<b>對手</b>指定你的棋子。卡牌可連鎖抽下一張。</li></ul>
+    <ul><li>在<b>對方半場</b>的紅、黃、藍事件格停下（含搶斷後），可選擇抽同色牌：<b>紅卡 19 張（移動步數類）</b>、<b>黃卡 15 張（戰場配置、戰況類）</b>、<b>藍卡 2 張（角色性能類）</b>。</li>
+    <li>紅：長驅直入、兩翼齊飛、快攻啟動、連攻戰術、進攻重擲、頂上功夫、再次行動、戰術失誤、失算控球、門將調度。</li>
+    <li>黃：結界失效、獎盃回收、鬥牛陣、香蕉皮、水炸彈、任意門、和平令、沙拉油。</li>
+    <li>藍：門將威能（自己回合開始時可發動：門將腳下與左右共 3 格出現靈壓牆 2 回合，任何球員無法穿越）。</li>
+    <li>區域類效果以「回合」計：雙方各行動一次算一回合。畫面右上角會列出目前生效中的效果。</li></ul>
     <h3>PK</h3><ul><li>主罰與防守方各擲「進攻骰＋防守骰」相加，<b>主罰必須嚴格大於</b>防守方才進球。</li></ul>
     <h3>3D 視角操作</h3>
     <ul><li>手機：單指拖曳旋轉、雙指縮放/平移、輕點選取。電腦：左鍵拖曳旋轉、右鍵或 Shift＋拖曳平移、滾輪縮放；鍵盤 1＝進攻骰、2＝防守骰、Esc＝取消選取、方向鍵/WASD 平移、Q/E 旋轉。</li></ul>
-    <div class="note">本版依手冊 2026.11.05 最新規則實作。手冊未提供的細節（棋盤精確格數、各牌文字、罰下回合數、PK 等）為本作補充設定：棋盤 35×15 六角格、54 張牌（各色 18 張）、罰下缺席 2 回合；進球時若走到指定點後仍有剩餘步數即可跨線得分。</div>
+    <div class="note">本版依手冊 2026.11.05 最新規則實作。手冊未提供的細節（棋盤精確格數、各牌文字、罰下回合數、PK 等）為本作補充設定：棋盤 35×15 六角格、36 張牌（紅 19／黃 15／藍 2）、罰下缺席 2 回合；進球時若走到指定點後仍有剩餘步數即可跨線得分。</div>
     <div class="row"><button class="btn pri" id="rulesClose">知道了</button></div>
   </div>
 </div>
@@ -394,37 +403,39 @@ GP[1].forEach(i => cells[i].gp = 1);
 
 /* ---------- 卡牌 ---------- */
 const KINDS = {
-  move2: { name: '邊路突破', text: '己方任一棋子移動 2 步（可全場搶斷）', fav: true, e: { k: 'move', n: 2 } },
-  move3: { name: '長驅直入', text: '己方任一棋子移動 3 步（可全場搶斷）', fav: true, e: { k: 'move', n: 3 } },
-  move4: { name: '直塞穿透', text: '己方任一棋子移動 4 步（超過 3 步只能在對方半場搶斷）', fav: true, e: { k: 'move', n: 4 } },
-  wings: { name: '兩翼齊飛', text: '兩枚不同棋子各移動 2 步，逐枚結算', fav: true, e: { k: 'wings' } },
-  fj: { name: '快攻啟動', text: '己方任一棋子直接跳到一個空的快攻點', fav: true, e: { k: 'fj' } },
-  roll: { name: '重擲進攻骰', text: '擲進攻骰，己方一枚棋子照點數移動', fav: true, e: { k: 'roll' } },
-  red: { name: '紅牌罰下', text: '指定對手一枚非門將棋子罰下，缺席 2 個回合', fav: true, e: { k: 'red' } },
-  pk: { name: '獲得 PK', text: '立即執行 PK：你的總和必須嚴格大於對手才進球', fav: true, e: { k: 'pk' } },
-  extra: { name: '再來一回合', text: '本回合結束後，你再行動一次', fav: true, e: { k: 'extra' } },
-  var: { name: 'VAR 回看', text: '取消對手一個已進球（對手零分則不生效）', fav: true, e: { k: 'var' } },
-  gk: { name: '門將調度', text: '己方門將改放到自己半場任一空的深綠格', fav: true, e: { k: 'gk' } },
-  force3: { name: '戰術失誤', text: '對手指定你一枚棋子，強制移動 3 步', fav: false, e: { k: 'force', n: 3 } },
-  force2: { name: '傳球失誤', text: '對手指定你一枚棋子，強制移動 2 步', fav: false, e: { k: 'force', n: 2 } },
-  sendme: { name: '被紅牌罰下', text: '對手指定你一枚非門將棋子罰下，缺席 2 個回合', fav: false, e: { k: 'sendme' } },
-  oppextra: { name: '失去控球', text: '對手獲得額外一個回合', fav: false, e: { k: 'oppextra' } },
-  oppk: { name: '對手 PK', text: '對手立即執行 PK（總和嚴格大於你才進球）', fav: false, e: { k: 'oppk' } },
-  oppfree3: { name: '對手反擊', text: '對手一枚棋子移動 3 步', fav: false, e: { k: 'oppfree', n: 3 } },
-  oppfree2: { name: '對手推進', text: '對手一枚棋子移動 2 步', fav: false, e: { k: 'oppfree', n: 2 } }
+  long3: { name: '長驅直入', icon: '🏃', text: '己方一枚棋子移動 3 步，可全場搶斷', e: { k: 'move', n: 3 } },
+  wings: { name: '兩翼齊飛', icon: '🪽', text: '兩枚不同棋子（可含對手）各移動 2 步，逐枚結算', e: { k: 'wings' } },
+  fj: { name: '快攻啟動', icon: '⚡', text: '己方一枚棋子直接跳到空的快攻點', e: { k: 'fj' } },
+  chain: { name: '連攻戰術', icon: '🔗', text: '己方一枚棋子移動 3 步；若在對方半場搶斷成功，再選己方一枚棋子移動 2 步', e: { k: 'chain' } },
+  roll: { name: '進攻重擲', icon: '🎲', text: '擲進攻骰，己方一枚棋子照點數移動', e: { k: 'roll' } },
+  headpk: { name: '頂上功夫', icon: '🥅', text: '立即 PK：進攻骰＋防守骰總和嚴格大於對手，則跳過對手下個回合，換你再行動', e: { k: 'headpk' } },
+  extra: { name: '再次行動', icon: '⏩', text: '本回合結束後，你再行動一次', e: { k: 'extra' } },
+  force3: { name: '戰術失誤', icon: '⚠️', text: '對手指定你一枚棋子，強制移動 3 步', e: { k: 'force', n: 3 } },
+  oppextra: { name: '失算控球', icon: '💨', text: '對手獲得額外一個回合', e: { k: 'oppextra' } },
+  gk: { name: '門將調度', icon: '🧤', text: '己方門將改放到自己半場任一空的深綠格', e: { k: 'gk' } },
+  noqa: { name: '結界失效', icon: '🚫', text: '對手踩進快攻點無法轉移點位，持續 2 回合', e: { k: 'noqa' } },
+  var: { name: '獎盃回收', icon: '🏆', text: '取消對手一個已進球（對手零分則不生效）', e: { k: 'var' } },
+  bull: { name: '鬥牛陣', icon: '🐂', text: '我方半場衝出 3 頭牛橫向衝撞，路上的棋子被撞回各自半場的深綠格重新落點', e: { k: 'bull' } },
+  peel: { name: '香蕉皮', icon: '🍌', text: '在己方半場暗放 3 個香蕉皮（只有你看得到）；棋子踩到即停在原地並暫停 1 回合，香蕉皮消失。同機雙人：改為隨機讓對方 3 名球員扭傷暫停 1 回合', e: { k: 'peel' } },
+  flood: { name: '水炸彈', icon: '💦', text: '指定一格，連同周圍共 7 格淹水 2 回合，任何球員都無法踏入（不可涵蓋雙方深綠格）', e: { k: 'area', fx: 'flood' } },
+  swap: { name: '任意門', icon: '🚪', text: '指定兩名球員互換位置（不分敵我，門將除外）', e: { k: 'swap' } },
+  peace: { name: '和平令', icon: '🕊️', text: '指定一格，連同周圍共 7 格，1 回合內無法搶斷', e: { k: 'area', fx: 'nosteal' } },
+  oil: { name: '沙拉油', icon: '🛢️', text: '指定一格，連同周圍共 7 格持續 3 回合；踩進的球員下個回合所有骰點 −2', e: { k: 'area', fx: 'oil' } },
+  gkpow: { name: '門將威能', icon: '🛡️', text: '門將獲得一次主動技能（自己回合可發動）：腳下與左右共 3 格出現靈壓牆 2 回合，任何球員都無法穿越；期間門將不可自行移動', e: { k: 'gkpow' } }
 };
 const COMP = {
-  red: { move3: 2, move2: 2, wings: 2, move4: 1, fj: 1, roll: 1, red: 1, pk: 1, extra: 1, var: 1, force3: 1, force2: 1, sendme: 1, oppextra: 1, oppk: 1 },
-  yellow: { move3: 2, move2: 2, wings: 1, fj: 1, roll: 1, gk: 1, red: 1, extra: 1, move4: 1, pk: 1, force3: 2, force2: 1, sendme: 1, oppextra: 1, oppfree2: 1 },
-  blue: { move3: 1, move4: 1, wings: 1, fj: 1, red: 1, pk: 1, extra: 1, roll: 1, var: 1, force3: 2, force2: 1, sendme: 1, oppk: 2, oppextra: 1, oppfree3: 1, oppfree2: 1 }
+  red: { long3: 2, wings: 2, fj: 2, chain: 2, roll: 2, headpk: 2, extra: 1, force3: 2, oppextra: 2, gk: 2 },
+  yellow: { noqa: 2, var: 1, bull: 2, peel: 2, flood: 2, swap: 2, peace: 2, oil: 2 },
+  blue: { gkpow: 2 }
 };
+const FX_DUR = { flood: 4, nosteal: 2, oil: 6 }; // 以「換邊次數」計；2 次 = 1 回合（雙方各行動一次）
 const CARDS = [];
 const DECK_IDS = { red: [], yellow: [], blue: [] };
 for (const col of ['red', 'yellow', 'blue'])
   for (const k of Object.keys(COMP[col]))
     for (let i = 0; i < COMP[col][k]; i++) {
       const id = CARDS.length;
-      CARDS.push({ id, color: col, kind: k, name: KINDS[k].name, text: KINDS[k].text, fav: KINDS[k].fav, e: KINDS[k].e });
+      CARDS.push({ id, color: col, kind: k, name: KINDS[k].name, icon: KINDS[k].icon, text: KINDS[k].text, e: KINDS[k].e });
       DECK_IDS[col].push(id);
     }
 
@@ -438,6 +449,18 @@ function occ(S) { const a = new Int16Array(cells.length).fill(-1); for (const p 
 const ev = (S, e) => S.ev.push(e);
 const toast = (S, text) => ev(S, { t: 'toast', text });
 const note = (S, team, text) => ev(S, { t: 'note', team, text });
+const areaOf = c => [c].concat(cells[c].nb);
+const inArea = (S, k, cell) => S.fx.some(f => f.k === k && f.cells.indexOf(cell) >= 0);
+const noQA = (S, team) => S.fx.some(f => f.k === 'noqa' && f.team === team);
+const gkLocked = (S, team) => S.fx.some(f => f.k === 'barrier' && f.team === team);
+const ZERO_B = new Uint8Array(cells.length);
+function blockedSet(S) { if (!S.fx.some(f => f.k === 'flood' || f.k === 'barrier')) return ZERO_B; const b = new Uint8Array(cells.length); for (const f of S.fx) if (f.k === 'flood' || f.k === 'barrier') for (const c of f.cells) b[c] = 1; return b; }
+const colCells = []; for (const C of cells) (colCells[C.c] = colCells[C.c] || []).push(C.id);
+function areaCenters(S, fx) { const out = []; for (const C of cells) { if (fx === 'flood' && areaOf(C.id).some(i => cells[i].dark)) continue; out.push(C.id); } return out; }
+function peelCells(S, team) {
+  const o = occ(S), b = blockedSet(S);
+  return cells.filter(C => C.side === team && !C.dark && C.gp < 0 && C.id !== HOME[team] && o[C.id] === -1 && !b[C.id] && !S.peels.some(p => p.cell === C.id)).map(C => C.id);
+}
 
 /* ---------- 快攻點：每個半場 4 個，每回合開始隨機重排（不占深綠格/事件格/門前點/棋子） ---------- */
 const isQA = (S, c) => S.qa.indexOf(c) >= 0;
@@ -460,10 +483,11 @@ function newState(cfg) {
   const S = {
     v: 1, seq: 0, goals: cfg.goals || 3, phase: 'setup', turn: 0, ctrl: 0,
     score: [0, 0], pieces: [], decks: {}, queue: [], cur: null, bonus: [0, 0], ev: [],
-    winner: -1, setup: { first: 0 }, lastMoved: -1, die: null
+    winner: -1, setup: { first: 0 }, lastMoved: -1, die: null,
+    local: !!cfg.local, tc: 0, fx: [], peels: [], slip: [0, 0], gkp: [false, false]
   };
   for (let t = 0; t < 2; t++)
-    for (let i = 0; i < 11; i++) S.pieces.push({ id: t * 11 + i, team: t, gk: i === 0, cell: i === 0 ? HOME[t] : -1, off: 0 });
+    for (let i = 0; i < 11; i++) S.pieces.push({ id: t * 11 + i, team: t, gk: i === 0, cell: i === 0 ? HOME[t] : -1, off: 0, stun: 0 });
   for (const c of ['red', 'yellow', 'blue']) S.decks[c] = shuffle(DECK_IDS[c]);
   S.qa = genQA(S);
   const first = ri(0, 1); S.setup.first = first; S.ctrl = first;
@@ -477,6 +501,7 @@ function canSteal(S, P, Q, cell, ctx) {
   if (Q.team === P.team) return false;
   const C = cells[cell];
   if (isQA(S, cell)) return false; // 快攻點上的對手受保護
+  if (inArea(S, 'nosteal', cell)) return false; // 和平令
   const oppHalf = C.side === 1 - P.team || C.side === 2;
   if (ctx.kind === 'die') {
     if (P.gk) return ctx.die === 'def';
@@ -490,7 +515,7 @@ function canSteal(S, P, Q, cell, ctx) {
 
 /* ---------- 可達落點 ---------- */
 function reach(S, pid, task, occA) {
-  const P = S.pieces[pid], t = P.team, N = task.steps, forced = !!task.forced, ctx = task.ctx || {};
+  const P = S.pieces[pid], t = P.team, N = task.steps, forced = !!task.forced || (!!task.any && P.team !== task.team), ctx = task.ctx || {}, blk = blockedSet(S);
   const out = [], seen = new Set();
   const vis = new Uint8Array(cells.length);
   const path = [P.cell]; vis[P.cell] = 1;
@@ -508,7 +533,7 @@ function reach(S, pid, task, occA) {
       if (Q.team === t) {
         if (forced || isQA(S, cell) || k - N >= MAXB) return; // 疊人加步；己方占住的快攻點不能當接力站
         if (C.gp === t) add('goal', -1);
-        for (const n of C.nb) { if (vis[n]) continue; vis[n] = 1; path.push(n); rec(n, k + 1); path.pop(); vis[n] = 0; }
+        for (const n of C.nb) { if (vis[n] || blk[n]) continue; vis[n] = 1; path.push(n); rec(n, k + 1); path.pop(); vis[n] = 0; }
         return;
       }
       if (!forced && canSteal(S, P, Q, cell, ctx)) add('steal', cell, o);
@@ -516,7 +541,7 @@ function reach(S, pid, task, occA) {
     }
     if (C.gp === t && !forced) add('goal', -1);
     for (const n of C.nb) {
-      if (vis[n]) continue;
+      if (vis[n] || blk[n]) continue;
       if (k === 0 && N > 1) { const o = occA[n]; if (o >= 0 && S.pieces[o].team !== t) continue; } // 正面封堵
       vis[n] = 1; path.push(n); rec(n, k + 1); path.pop(); vis[n] = 0;
     }
@@ -528,7 +553,9 @@ function movable(S, task, occA) {
   occA = occA || occ(S);
   const res = {};
   for (const p of S.pieces) {
-    if (p.team !== task.team || p.cell < 0) continue;
+    if ((!task.any && p.team !== task.team) || p.cell < 0) continue;
+    const eff = !!task.forced || (!!task.any && p.team !== task.team); // 被指定移動的棋子不受暫停/靈壓限制
+    if (!eff && (p.stun > 0 || (p.gk && gkLocked(S, p.team)))) continue;
     if (task.exLast && p.id === S.lastMoved) continue;
     const r = reach(S, p.id, task, occA);
     if (r.length) res[p.id] = r;
@@ -536,19 +563,20 @@ function movable(S, task, occA) {
   return res;
 }
 function respawnCells(S, P) {
-  const o = occ(S), t = P.team; let l = [];
-  if (P.gk && o[HOME[t]] === -1) return [HOME[t]];
-  for (const id of DARK[t]) if (o[id] === -1) l.push(id);
-  if (!l.length) for (const C of cells) if (C.side === t && o[C.id] === -1) l.push(C.id);
+  const o = occ(S), t = P.team, b = blockedSet(S); let l = [];
+  if (P.gk && o[HOME[t]] === -1 && !b[HOME[t]]) return [HOME[t]];
+  for (const id of DARK[t]) if (o[id] === -1 && !b[id]) l.push(id);
+  if (!l.length) for (const C of cells) if (C.side === t && o[C.id] === -1 && !b[C.id]) l.push(C.id);
   return l;
 }
 function jumpTargets(S, task) {
-  const P = S.pieces[task.pid], o = occ(S), from = cells[P.cell], res = [];
+  const P = S.pieces[task.pid], o = occ(S), from = cells[P.cell], res = [], b = blockedSet(S);
+  if (noQA(S, P.team)) return res;
   for (const q of S.qa) {
-    if (q === P.cell) continue;
+    if (q === P.cell || b[q]) continue;
     const oc = o[q];
     if (oc === -1) res.push({ to: q, kind: 'move', victim: -1 });
-    else if (S.pieces[oc].team !== P.team && from.side === 1 - P.team && cells[q].side === P.team)
+    else if (S.pieces[oc].team !== P.team && from.side === 1 - P.team && cells[q].side === P.team && !inArea(S, 'nosteal', q))
       res.push({ to: q, kind: 'steal', victim: oc }); // 回跳搶斷
   }
   return res;
@@ -567,11 +595,25 @@ function scoreGoal(S, team) {
 }
 function endTurn(S) {
   S.die = null;
-  if (S.bonus[S.turn] > 0) { S.bonus[S.turn]--; toast(S, TEAM_NAMES[S.turn] + ' 再行動一次'); note(S, S.turn, '⏩ 額外回合：再行動一次'); } else S.turn = 1 - S.turn;
+  if (S.bonus[S.turn] > 0) { S.bonus[S.turn]--; toast(S, TEAM_NAMES[S.turn] + ' 再行動一次'); note(S, S.turn, '⏩ 額外回合：再行動一次'); }
+  else {
+    const L = S.turn;
+    for (const p of S.pieces) if (p.team === L && p.stun === 2) p.stun = 0;
+    if (S.slip[L] === 2) S.slip[L] = 0;
+    S.turn = 1 - S.turn; S.tc++;
+    let ended = false;
+    for (const f of S.fx) f.left--;
+    if (S.fx.some(f => f.left <= 0)) { ended = true; S.fx = S.fx.filter(f => f.left > 0); }
+    if (ended) ev(S, { t: 'fxend' });
+    for (const p of S.pieces) if (p.team === S.turn && p.stun === 1) p.stun = 2;
+    if (S.slip[S.turn] === 1) S.slip[S.turn] = 2;
+  }
   ev(S, { t: 'turn', team: S.turn });
   S.qa = genQA(S); ev(S, { t: 'qa', cells: S.qa.slice() });
   const q = [];
   for (const p of S.pieces) if (p.team === S.turn && p.off > 0) { p.off--; if (p.off === 0) { q.push({ k: 'respawn', team: S.turn, pid: p.id, reason: 'return' }); note(S, S.turn, '🔁 罰下期滿：球員返回場中'); } }
+  if (S.slip[S.turn] === 2) note(S, S.turn, '🛢️ 腳滑：本回合所有骰點 −2');
+  for (const p of S.pieces) if (p.team === S.turn && p.stun === 2 && p.cell >= 0) note(S, S.turn, '🍌 ' + (p.id % 11 === 0 ? '門將' : '#' + (p.id % 11 + 1) + ' 球員') + ' 受傷暫停，本回合不能移動');
   q.push({ k: 'die', team: S.turn });
   S.queue.push(...q);
 }
@@ -587,6 +629,7 @@ function runTask(S, t) {
   switch (t.k) {
     case 'die': setCur(S, t, t.team); break;
     case 'move': {
+      if (t.steps <= 0) { toast(S, TEAM_NAMES[t.team] + ' 步數為 0，略過'); break; }
       if (!Object.keys(movable(S, t)).length) { toast(S, TEAM_NAMES[t.team] + ' 這個點數沒有合法走法，略過'); break; }
       setCur(S, t, t.chooser !== undefined ? t.chooser : t.team); break;
     }
@@ -606,16 +649,28 @@ function runTask(S, t) {
       const ok = S.pieces.some(p => p.team === t.victim && !p.gk && p.cell >= 0);
       if (!ok) break; setCur(S, t, t.chooser); break;
     }
+    case 'area': setCur(S, t, t.team); break;
+    case 'peel': if (!peelCells(S, t.team).length) { toast(S, '沒有可放香蕉皮的格子'); break; } setCur(S, t, t.team); break;
+    case 'swap': if (S.pieces.filter(p => !p.gk && p.cell >= 0).length < 2) { toast(S, '場上球員不足，無法互換'); break; } setCur(S, t, t.team); break;
     case 'fj': {
+      if (noQA(S, t.team)) { toast(S, TEAM_NAMES[t.team] + ' 受到結界失效影響，無法使用快攻'); break; }
       const o = occ(S);
       if (!S.qa.some(q => o[q] === -1) || !S.pieces.some(p => p.team === t.team && p.cell >= 0)) break;
       setCur(S, t, t.team); break;
     }
     case 'gk': setCur(S, t, t.team); break;
     case 'pk': {
+      const sl = S.slip[t.team] === 2 ? 2 : 0;
       const a = [rollAtt(), rollDef()], d = [rollAtt(), rollDef()];
-      const A = a[0] + a[1], D = d[0] + d[1], win = A > D;
+      const A = Math.max(0, a[0] - sl) + Math.max(0, a[1] - sl), D = d[0] + d[1], win = A > D;
       ev(S, { t: 'pk', team: t.team, a, d });
+      if (sl) note(S, t.team, `🛢️ 腳滑：PK 點數 ${a[0] + a[1]} → ${A}`);
+      if (t.ext) {
+        toast(S, `頂上功夫 PK：${TEAM_NAMES[t.team]} ${A} 對 ${D}，${win ? '成功！跳過對手下個回合' : '失敗'}`);
+        note(S, t.team, win ? '🥅 PK 成功：跳過對手下個回合' : '🥅 PK 失敗');
+        if (win) S.bonus[t.team]++;
+        break;
+      }
       toast(S, `PK：${TEAM_NAMES[t.team]} ${A} 對 ${D}，${win ? '進球！' : '沒進'}`);
       if (win) scoreGoal(S, t.team);
       break;
@@ -636,15 +691,28 @@ function applyJump(S, task, tg) {
   S.queue.unshift(...rest);
 }
 function landEffects(S, P, task) {
-  const C = cells[P.cell], list = [];
-  if (isQA(S, P.cell)) list.push({ k: 'jump', team: P.team, pid: P.id, chooser: task.forced ? task.chooser : undefined });
-  else if (!task.forced && C.ev && (C.side === 1 - P.team)) list.push({ k: 'drawq', team: P.team, color: C.ev, pid: P.id });
+  const C = cells[P.cell], list = [], frc = !!task.forced || (!!task.any && P.team !== task.team);
+  if (isQA(S, P.cell)) { if (!noQA(S, P.team)) list.push({ k: 'jump', team: P.team, pid: P.id, chooser: frc ? (task.forced ? task.chooser : task.team) : undefined }); }
+  else if (!frc && C.ev && (C.side === 1 - P.team)) list.push({ k: 'drawq', team: P.team, color: C.ev, pid: P.id });
   return list;
 }
 function applyMove(S, task, pid, oc) {
-  const P = S.pieces[pid], from = P.cell;
-  ev(S, { t: 'move', pid, path: oc.path.slice(), goal: oc.kind === 'goal' });
+  const P = S.pieces[pid];
+  let path = oc.path.slice();
   S.lastMoved = pid; S.cur = null;
+  // 香蕉皮：路上第一個香蕉皮 → 停在該格跌倒
+  let hit = -1, pe = -1;
+  for (let i = 1; i < path.length && hit < 0; i++) { const k = S.peels.findIndex(x => x.cell === path[i]); if (k >= 0) { hit = i; pe = k; } }
+  if (hit >= 0) {
+    path = path.slice(0, hit + 1);
+    ev(S, { t: 'move', pid, path, goal: false });
+    P.cell = path[hit]; P.stun = 1; S.peels.splice(pe, 1);
+    ev(S, { t: 'slip', pid, kind: 'peel' });
+    note(S, P.team, '🍌 踩到香蕉皮：原地跌倒，暫停 1 回合');
+    return;
+  }
+  ev(S, { t: 'move', pid, path, goal: oc.kind === 'goal' });
+  if (path.slice(1).some(c => inArea(S, 'oil', c))) { S.slip[P.team] = Math.max(S.slip[P.team], 1); note(S, P.team, '🛢️ 踩到沙拉油：下個回合所有骰點 −2'); ev(S, { t: 'slip', pid, kind: 'oil' }); }
   const q = [];
   if (oc.kind === 'goal') {
     P.cell = -1;
@@ -658,32 +726,65 @@ function applyMove(S, task, pid, oc) {
     }
     P.cell = oc.to;
     q.push(...landEffects(S, P, task));
+    if (task.chain && oc.kind === 'steal' && cells[oc.to].side === 1 - P.team) {
+      note(S, task.team, '🔗 連攻成功：再選一枚己方棋子移動 2 步');
+      q.push({ k: 'move', team: task.team, steps: 2, ctx: { kind: 'card', steps: 2 } });
+    }
   }
   S.queue.unshift(...q);
 }
+function bullRush(S, d) {
+  const lo = d === 0 ? 2 : 19, hi = d === 0 ? 15 : 32, used = new Set(), lanes = [];
+  const cand = shuffle(cells.filter(C => C.side === d && C.c >= lo && C.c <= hi && !C.dark));
+  for (const C of cand) {
+    if (lanes.length >= 3) break; if (used.has(C.r)) continue; used.add(C.r);
+    const dir = Math.random() < .5 ? 1 : -1, ids = [];
+    for (let c = C.c; c >= 0 && c < COLS; c += dir) {
+      let bi = -1, bd = 1e9; for (const id of colCells[c]) { const dz = Math.abs(cells[id].z - C.z); if (dz < bd) { bd = dz; bi = id; } } ids.push(bi);
+    }
+    lanes.push({ ids, dir, hits: [] });
+  }
+  const hitSet = new Set(), q = [];
+  for (const L of lanes) L.ids.forEach((id, i) => { const pc = S.pieces.find(p => p.cell === id && !p.gk && !hitSet.has(p.id)); if (pc) { hitSet.add(pc.id); L.hits.push({ pid: pc.id, i }); } });
+  ev(S, { t: 'bull', lanes: lanes.map(L => ({ ids: L.ids, dir: L.dir, hits: L.hits })) });
+  for (const pid of hitSet) {
+    const P = S.pieces[pid]; P.cell = -1;
+    note(S, P.team, '🐂 被牛撞飛：返回己方綠格重新落點');
+    q.push({ k: 'respawn', team: P.team, pid, reason: 'bull' });
+  }
+  if (!hitSet.size) toast(S, '鬥牛陣：沒有撞到任何棋子');
+  return q;
+}
 function applyCard(S, t) {
   const card = CARDS[t.id], d = t.team, o = 1 - d, e = card.e, q = [];
-  const cardCtx = n => ({ kind: 'card', steps: n });
-  const NT = { move: [d, `🃏 可移動一枚棋子 ${e.n} 步`], wings: [d, '🃏 兩枚棋子各移動 2 步'], roll: [d, '🃏 重擲進攻骰：棋子照點數移動'], fj: [d, '🃏 可跳到快攻點'], extra: [d, '🃏 本回合結束後再行動一次'],
-    red: [d, '🃏 可罰下對手一名球員'], pk: [d, '🃏 獲得 PK 機會'], gk: [d, '🃏 可調度門將'], oppfree: [o, `🃏 對手送你：可移動一枚棋子 ${e.n} 步`],
-    force: [d, `🃏 失誤！被迫移動一枚棋子 ${e.n} 步`], sendme: [d, '🃏 你一名球員將被罰下'], oppextra: [o, '🃏 獲得額外一個回合'], oppk: [o, '🃏 獲得 PK 機會'] };
-  if (NT[e.k]) note(S, NT[e.k][0], NT[e.k][1]);
-  else if (e.k === 'var' && S.score[o] > 0) note(S, d, '🃏 VAR：取消對手一個進球');
+  const cc = n => ({ kind: 'card', steps: n });
   switch (e.k) {
-    case 'move': q.push({ k: 'move', team: d, steps: e.n, ctx: cardCtx(e.n) }); break;
-    case 'wings': q.push({ k: 'move', team: d, steps: 2, ctx: cardCtx(2) }, { k: 'move', team: d, steps: 2, ctx: cardCtx(2), exLast: true }); break;
-    case 'roll': { const v = rollAtt(); ev(S, { t: 'dice', team: d, type: 'att', val: v }); q.push({ k: 'move', team: d, steps: v, ctx: { kind: 'die', die: 'att', steps: v } }); break; }
-    case 'fj': q.push({ k: 'fj', team: d }); break;
-    case 'extra': S.bonus[d]++; break;
-    case 'red': q.push({ k: 'sendoff', chooser: d, victim: o }); break;
-    case 'pk': q.push({ k: 'pk', team: d }); break;
-    case 'var': if (S.score[o] > 0) { S.score[o]--; toast(S, 'VAR 判定：' + TEAM_NAMES[o] + ' 的進球無效，比分 −1'); } else toast(S, 'VAR：對手零分，不生效'); break;
-    case 'gk': q.push({ k: 'gk', team: d }); break;
-    case 'oppfree': q.push({ k: 'move', team: o, steps: e.n, ctx: cardCtx(e.n) }); break;
-    case 'force': q.push({ k: 'move', team: d, steps: e.n, forced: true, chooser: o, ctx: { kind: 'forced', steps: e.n } }); break;
-    case 'sendme': q.push({ k: 'sendoff', chooser: o, victim: d }); break;
-    case 'oppextra': S.bonus[o]++; break;
-    case 'oppk': q.push({ k: 'pk', team: o }); break;
+    case 'move': q.push({ k: 'move', team: d, steps: e.n, ctx: cc(e.n) }); note(S, d, `🃏 可移動一枚棋子 ${e.n} 步`); break;
+    case 'chain': q.push({ k: 'move', team: d, steps: 3, chain: true, ctx: cc(3) }); note(S, d, '🔗 移動 3 步；在對方半場搶斷成功可再移動 2 步'); break;
+    case 'wings': q.push({ k: 'move', team: d, steps: 2, any: true, ctx: cc(2) }, { k: 'move', team: d, steps: 2, any: true, exLast: true, ctx: cc(2) }); note(S, d, '🪽 兩枚不同棋子各移動 2 步（可選對手棋子）'); break;
+    case 'roll': { let v = rollAtt(); ev(S, { t: 'dice', team: d, type: 'att', val: v }); const sl = S.slip[d] === 2 ? 2 : 0; q.push({ k: 'move', team: d, steps: Math.max(0, v - sl), ctx: { kind: 'die', die: 'att', steps: v } }); note(S, d, '🎲 重擲進攻骰'); break; }
+    case 'fj': q.push({ k: 'fj', team: d }); if (!noQA(S, d)) note(S, d, '⚡ 可跳到快攻點'); break;
+    case 'extra': S.bonus[d]++; note(S, d, '⏩ 本回合結束後再行動一次'); break;
+    case 'headpk': q.push({ k: 'pk', team: d, ext: true }); note(S, d, '🥅 頂上功夫：PK 對決，勝出可跳過對手下個回合'); break;
+    case 'var': if (S.score[o] > 0) { S.score[o]--; note(S, d, '🏆 取消對手一個進球'); toast(S, 'VAR 判定：' + TEAM_NAMES[o] + ' 的進球無效，比分 −1'); } else toast(S, 'VAR：對手零分，不生效'); break;
+    case 'gk': q.push({ k: 'gk', team: d }); note(S, d, '🧤 可調度門將'); break;
+    case 'force': q.push({ k: 'move', team: d, steps: e.n, forced: true, chooser: o, ctx: { kind: 'forced', steps: e.n } }); note(S, d, `⚠️ 失誤！被迫移動一枚棋子 ${e.n} 步`); break;
+    case 'oppextra': S.bonus[o]++; note(S, o, '💨 對手失算：你獲得額外一個回合'); break;
+    case 'noqa': S.fx.push({ k: 'noqa', team: o, cells: [], left: 4 }); note(S, o, '🚫 結界失效：踩快攻點無法轉移（2 回合）'); ev(S, { t: 'fx', k: 'noqa' }); break;
+    case 'bull': note(S, d, '🐂 鬥牛陣：3 頭牛衝出來了！'); q.push(...bullRush(S, d)); break;
+    case 'peel':
+      if (S.local) {
+        const pool = shuffle(S.pieces.filter(p => p.team === o && !p.gk && p.cell >= 0 && cells[p.cell].side === o)), n = Math.min(3, pool.length);
+        for (let i = 0; i < n; i++) { pool[i].stun = 1; ev(S, { t: 'slip', pid: pool[i].id, kind: 'sprain' }); }
+        if (n) note(S, o, `🍌 ${n} 名球員踩到香蕉皮扭傷，暫停 1 回合`); else toast(S, '對方半場沒有球員可被香蕉皮影響');
+      } else { q.push({ k: 'peel', team: d, n: 3 }); note(S, d, '🍌 暗放 3 個香蕉皮（只有你看得到）'); }
+      break;
+    case 'area': q.push({ k: 'area', team: d, fx: e.fx, dur: FX_DUR[e.fx] }); note(S, d, { flood: '💦 指定水炸彈落點（7 格淹水）', nosteal: '🕊️ 指定和平令區域（7 格禁止搶斷）', oil: '🛢️ 指定沙拉油區域（7 格）' }[e.fx]); break;
+    case 'swap': q.push({ k: 'swap', team: d }); note(S, d, '🚪 任意門：指定兩名球員互換位置'); break;
+    case 'gkpow':
+      if (S.gkp[d]) toast(S, TEAM_NAMES[d] + ' 已持有門將威能');
+      else { S.gkp[d] = true; note(S, d, '🛡️ 門將獲得威能：自己回合可發動'); }
+      break;
   }
   S.queue.unshift(...q);
 }
@@ -738,15 +839,17 @@ function act(S, a, who) {
     }
     case 'die': {
       if (!cur || cur.k !== 'die' || (a.type !== 'att' && a.type !== 'def')) break;
-      const val = a.type === 'att' ? rollAtt() : rollDef();
+      const val = a.type === 'att' ? rollAtt() : rollDef(), sl = S.slip[cur.team] === 2 ? 2 : 0, use = Math.max(0, val - sl);
       S.die = { type: a.type, val, team: cur.team }; ev(S, { t: 'dice', team: cur.team, type: a.type, val });
-      S.cur = null; S.queue.unshift({ k: 'move', team: cur.team, steps: val, ctx: { kind: 'die', die: a.type, steps: val } });
+      if (sl) note(S, cur.team, `🛢️ 腳滑：步數 ${val} → ${use}`);
+      S.cur = null; S.queue.unshift({ k: 'move', team: cur.team, steps: use, ctx: { kind: 'die', die: a.type, steps: val } });
       ok = true; break;
     }
     case 'move': {
       if (!cur || cur.k !== 'move') break;
-      const P = S.pieces[a.pid]; if (!P || P.team !== cur.team || P.cell < 0) break;
+      const P = S.pieces[a.pid]; if (!P || (!cur.any && P.team !== cur.team) || P.cell < 0) break;
       if (cur.exLast && P.id === S.lastMoved) break;
+      if (!movable(S, cur)[a.pid]) break;
       const oc = reach(S, a.pid, cur, occ(S)).find(o => o.kind === a.kind && o.to === a.to);
       if (!oc) break; applyMove(S, cur, a.pid, oc); ok = true; break;
     }
@@ -779,12 +882,39 @@ function act(S, a, who) {
     case 'fj': {
       if (!cur || cur.k !== 'fj') break;
       const P = S.pieces[a.pid]; if (!P || P.team !== cur.team || P.cell < 0) break;
-      if (!S.qa.includes(a.to) || occ(S)[a.to] !== -1) break;
+      if (!S.qa.includes(a.to) || occ(S)[a.to] !== -1 || blockedSet(S)[a.to] || noQA(S, cur.team)) break;
       const from = P.cell; P.cell = a.to; ev(S, { t: 'jump', pid: P.id, from, to: a.to }); S.cur = null; ok = true; break;
+    }
+    case 'area': {
+      if (!cur || cur.k !== 'area') break;
+      if (!areaCenters(S, cur.fx).includes(a.cell)) break;
+      const cl = areaOf(a.cell); S.fx.push({ k: cur.fx, cells: cl, center: a.cell, left: cur.dur, team: cur.team });
+      ev(S, { t: 'fx', k: cur.fx, center: a.cell }); S.cur = null; ok = true; break;
+    }
+    case 'peel': {
+      if (!cur || cur.k !== 'peel') break;
+      if (!peelCells(S, cur.team).includes(a.cell)) break;
+      S.peels.push({ cell: a.cell, team: cur.team }); ev(S, { t: 'peel', cell: a.cell, team: cur.team });
+      S.cur = null; if (cur.n > 1) S.queue.unshift({ k: 'peel', team: cur.team, n: cur.n - 1 });
+      ok = true; break;
+    }
+    case 'swap': {
+      if (!cur || cur.k !== 'swap') break;
+      const A = S.pieces[a.a], B = S.pieces[a.b];
+      if (!A || !B || A.id === B.id || A.gk || B.gk || A.cell < 0 || B.cell < 0) break;
+      const ca = A.cell, cb = B.cell; A.cell = cb; B.cell = ca;
+      ev(S, { t: 'swap', a: A.id, b: B.id, ca, cb }); S.cur = null; ok = true; break;
+    }
+    case 'gkskill': {
+      if (!cur || cur.k !== 'die' || !S.gkp[cur.team]) break;
+      const G = S.pieces[cur.team * 11]; if (G.cell < 0) break;
+      const gc = cells[G.cell], cl = [G.cell].concat(gc.nb.filter(n => cells[n].c === gc.c));
+      S.fx.push({ k: 'barrier', cells: cl, left: 4, team: cur.team }); S.gkp[cur.team] = false;
+      ev(S, { t: 'fx', k: 'barrier' }); note(S, cur.team, '🛡️ 門將威能發動：靈壓牆 2 回合'); ok = true; break;
     }
     case 'gk': {
       if (!cur || cur.k !== 'gk') break;
-      const P = S.pieces[cur.team * 11]; const okc = (DARK[cur.team].includes(a.cell) || a.cell === HOME[cur.team]) && occ(S)[a.cell] === -1;
+      const P = S.pieces[cur.team * 11]; const okc = (DARK[cur.team].includes(a.cell) || a.cell === HOME[cur.team]) && occ(S)[a.cell] === -1 && !blockedSet(S)[a.cell];
       if (!okc) break; ev(S, { t: 'respawn', pid: P.id, cell: a.cell }); P.cell = a.cell; S.cur = null; ok = true; break;
     }
   }
@@ -799,14 +929,14 @@ function autoAction(S, strat) {
   const c = S.cur; if (!c) return null;
   const pick = arr => arr[ri(0, arr.length - 1)];
   switch (c.k) {
-    case 'die': return { t: 'die', type: Math.random() < (smart ? 0.6 : 0.5) ? 'att' : 'def' };
+    case 'die': if (S.gkp[c.team] && S.pieces[c.team * 11].cell >= 0 && Math.random() < .5) return { t: 'gkskill' }; return { t: 'die', type: Math.random() < (smart ? 0.6 : 0.5) ? 'att' : 'def' };
     case 'move': {
-      const m = movable(S, c); let best = null, bv = -1e9; const forced = !!c.forced;
+      const m = movable(S, c); let best = null, bv = -1e9;
       for (const pid of Object.keys(m)) {
         const p = S.pieces[pid], p0 = progress(p.team, p.cell);
         for (const o of m[pid]) {
           const pr = o.kind === 'goal' ? 34 : progress(p.team, o.to);
-          let v;
+          let v; const forced = !!c.forced || (!!c.any && p.team !== c.team);
           if (!smart) v = Math.random();
           else if (forced) v = (p0 - pr) + p0 * 0.3 + Math.random() * 3;
           else {
@@ -833,13 +963,16 @@ function autoAction(S, strat) {
       const o = occ(S), qs = S.qa.filter(q => o[q] === -1), mine = S.pieces.filter(p => p.team === c.team && p.cell >= 0 && !p.gk);
       return { t: 'fj', pid: pick(mine).id, to: pick(qs) };
     }
+    case 'area': return { t: 'area', cell: pick(areaCenters(S, c.fx)) };
+    case 'peel': return { t: 'peel', cell: pick(peelCells(S, c.team)) };
+    case 'swap': { const l = S.pieces.filter(p => !p.gk && p.cell >= 0), A = pick(l); const B = pick(l.filter(p => p.id !== A.id)); return { t: 'swap', a: A.id, b: B.id }; }
     case 'gk': { const o = occ(S), l = DARK[c.team].filter(i => o[i] === -1).concat(o[HOME[c.team]] === -1 ? [HOME[c.team]] : []); return { t: 'gk', cell: pick(l) }; }
   }
   return null;
 }
 
 const E = { cells, cid, DARK, genQA, isQA, HOME, GP, CARDS, KINDS, TEAM_NAMES, FORMATIONS, COLS, MID, SQ3,
-  newState, act, advance, reach, movable, occ, respawnCells, jumpTargets, autoAction, progress, remaining, canSteal };
+  newState, act, advance, reach, areaOf, areaCenters, peelCells, blockedSet, inArea, noQA, gkLocked, FX_DUR, movable, occ, respawnCells, jumpTargets, autoAction, progress, remaining, canSteal };
 if (typeof module !== 'undefined' && module.exports) module.exports = E; else G.OG = E;
 })(typeof window !== 'undefined' ? window : globalThis);
 
@@ -928,6 +1061,12 @@ function stopMusic() { if (sched) clearInterval(sched); sched = null; trackName 
 /* --- 音效 --- */
 const fan = (t, notes, v) => notes.forEach(([m, dt, d]) => brass(t + dt, m, d, v || 1, sg));
 const SFX = {
+  bull(t) { osc('sawtooth', 120, t, .5, .35, sg, { to: 70, lp: 600 }); for (let i = 0; i < 8; i++) noise(t + i * .09, .06, .32, 'lowpass', 450, sg); osc('sawtooth', 190, t + .45, .7, .3, sg, { to: 110, lp: 700 }); },
+  bump(t) { noise(t, .12, .5, 'lowpass', 900, sg); osc('sine', 180, t, .2, .5, sg, { to: 60 }); },
+  slip(t) { osc('sine', 950, t, .35, .35, sg, { to: 200 }); osc('triangle', 500, t + .05, .3, .25, sg, { to: 900 }); noise(t + .32, .1, .3, 'lowpass', 500, sg); },
+  swap(t) { noise(t, .5, .45, 'bandpass', 800, sg, { to: 3000, q: 3, a: .1 }); osc('sine', 400, t, .5, .25, sg, { to: 1200 }); osc('sine', 1200, t + .45, .25, .2, sg, { to: 400 }); },
+  splash(t) { noise(t, .5, .55, 'bandpass', 1200, sg, { to: 300, q: .8, a: .02 }); for (let i = 0; i < 5; i++) osc('sine', 500 + Math.random() * 700, t + .1 + i * .07, .08, .2, sg, { to: 1400 }); },
+  shield(t) { for (let i = 0; i < 5; i++) osc('triangle', 500 * Math.pow(1.26, i), t + i * .06, .4, .18, sg); noise(t, .7, .2, 'highpass', 5000, sg, { a: .2 }); },
   click(t) { osc('square', 880, t, .06, .18, sg, { to: 1320, lp: 4000 }); osc('sine', 440, t, .05, .2, sg); },
   back(t) { osc('square', 700, t, .08, .16, sg, { to: 420, lp: 3000 }); },
   select(t) { osc('triangle', 660, t, .09, .25, sg, { to: 990 }); },
@@ -1352,6 +1491,109 @@ function qaTick(t) {
     o.pad.scale.setScalar(1); }
 }
 
+/* ---------- 特殊效果：淹水 / 和平令 / 沙拉油 / 靈壓牆 / 香蕉皮 / 暈眩 ---------- */
+let fxRoot = null, fxSig = '', fxAnim = [], peelView = 0, fxGeo = null;
+function emojiTex(ch) { return canvasTex(128, 128, (g) => { g.font = '92px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(ch, 64, 70); }); }
+function emojiSprite(ch, size) { const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: emojiTex(ch), transparent: true, depthWrite: false })); sp.scale.set(size, size, 1); sp.renderOrder = 5; return sp; }
+async function popEmoji(ch, x, z, big) {
+  const sp = emojiSprite(ch, 1); sp.position.set(x, 1.6, z); scene.add(sp);
+  await tween(1.1, (u) => { const k = (u < .25 ? u / .25 : 1) * (big || 2.2); sp.scale.set(k, k, 1); sp.position.y = 1.6 + u * 1.4; sp.material.opacity = u < .7 ? 1 : 1 - (u - .7) / .3; }, t => t);
+  scene.remove(sp); sp.material.map.dispose(); sp.material.dispose();
+}
+function syncFx(S, animate) {
+  if (!S || !S.fx) return;
+  const stun = S.pieces.filter(p => p.stun > 0 && p.cell >= 0).map(p => p.id);
+  const sig = JSON.stringify([S.fx.map(f => [f.k, f.cells, f.team]), S.peels.filter(q => q.team === peelView).map(q => q.cell), stun]);
+  if (sig === fxSig) return; fxSig = sig;
+  if (!fxGeo) { fxGeo = { hex: new THREE.CylinderGeometry(.93, .93, .07, 6), wall: new THREE.CylinderGeometry(.93, .93, 3, 6) }; fxGeo.hex.rotateY(Math.PI / 6); fxGeo.wall.rotateY(Math.PI / 6); }
+  if (fxRoot) { scene.remove(fxRoot); fxRoot.traverse(o => { if (o.material) { if (o.material.map) o.material.map.dispose(); o.material.dispose(); } }); }
+  fxRoot = new THREE.Group(); fxAnim = []; scene.add(fxRoot);
+  const STY = { flood: { c: 0x2f9bff, o: .6, amp: .16, em: '💦' }, nosteal: { c: 0xf4fff0, o: .42, amp: .12, em: '🕊️' }, oil: { c: 0x2b1d05, o: .78, amp: .08, em: '🛢️' } };
+  const born = [];
+  for (const f of S.fx) {
+    if (f.k === 'noqa') continue;
+    if (f.k === 'barrier') {
+      for (const c of f.cells) {
+        const C = cells[c], m = new THREE.Mesh(fxGeo.wall, new THREE.MeshBasicMaterial({ color: 0x48b8ff, transparent: true, opacity: .32, depthWrite: false, blending: THREE.AdditiveBlending }));
+        m.position.set(C.x, 1.5, C.z); fxRoot.add(m); born.push(m); fxAnim.push({ mat: m.material, base: .32, amp: .16, sp: 5, ph: c });
+        const b = new THREE.Mesh(fxGeo.hex, new THREE.MeshBasicMaterial({ color: 0xbfe6ff, transparent: true, opacity: .8, depthWrite: false })); b.position.set(C.x, .17, C.z); fxRoot.add(b); born.push(b); fxAnim.push({ mat: b.material, base: .7, amp: .25, sp: 6, ph: c * 2 });
+      }
+      const mid = cells[f.cells[0]], sp = emojiSprite('🛡️', 1.7); sp.position.set(mid.x, 3.4, mid.z); fxRoot.add(sp); fxAnim.push({ spr: sp, y: 3.4 });
+      continue;
+    }
+    const st = STY[f.k]; if (!st) continue;
+    for (const c of f.cells) {
+      const C = cells[c], m = new THREE.Mesh(fxGeo.hex, new THREE.MeshBasicMaterial({ color: st.c, transparent: true, opacity: st.o, depthWrite: false }));
+      m.position.set(C.x, .17, C.z); fxRoot.add(m); born.push(m); fxAnim.push({ mat: m.material, base: st.o, amp: st.amp, sp: f.k === 'flood' ? 3 : 2, ph: c * .7 });
+    }
+    const mid = cells[f.cells[0]], sp = emojiSprite(st.em, 1.5); sp.position.set(mid.x, 1.5, mid.z); fxRoot.add(sp); fxAnim.push({ spr: sp, y: 1.5 });
+  }
+  for (const q of S.peels) if (q.team === peelView) { const C = cells[q.cell], sp = emojiSprite('🍌', 1.25); sp.position.set(C.x, .75, C.z); fxRoot.add(sp); born.push(sp); fxAnim.push({ spr: sp, y: .75, small: true }); }
+  if (animate) for (const m of born) { const target = m.scale.clone(); m.scale.multiplyScalar(.01); tween(.55, (u) => m.scale.copy(target).multiplyScalar(Math.max(.01, u < .75 ? u / .75 * 1.15 : 1.15 - (u - .75) / .25 * .15)), t => t).then(() => m.scale.copy(target)); }
+  // 暈眩標記
+  for (const m of pm) { const on = stun.indexOf(m.pid) >= 0; if (on && !m.dizzy) { m.dizzy = emojiSprite('💫', 1.1); m.dizzy.position.y = 2.9; m.g.add(m.dizzy); } if (m.dizzy) m.dizzy.visible = on; }
+}
+function fxTick(t) {
+  for (const a of fxAnim) {
+    if (a.mat) a.mat.opacity = Math.max(.05, a.base + a.amp * Math.sin(t * a.sp + a.ph));
+    else if (a.spr) a.spr.position.y = a.y + (a.small ? .12 : .3) * Math.sin(t * 3 + a.y);
+  }
+  for (const m of pm) if (m.dizzy && m.dizzy.visible) { m.dizzy.position.y = 2.9 + .12 * Math.sin(t * 6); m.dizzy.material.rotation = t * 3; }
+}
+function makeBull() {
+  const g = new THREE.Group(), legs = [];
+  const brown = lam(0x7a4a2a), dark = lam(0x4e2c16), white = lam(0xfff3d6), red = new THREE.MeshBasicMaterial({ color: 0xff2a1a }), gold = lam(0xffc23a);
+  const add = (geo, mat, x, y, z, rx, rz) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); if (rx) m.rotation.x = rx; if (rz) m.rotation.z = rz; m.castShadow = true; g.add(m); return m; };
+  add(new THREE.BoxGeometry(1.25, 1.05, 2.1), brown, 0, 1.25, 0);
+  add(new THREE.BoxGeometry(1.0, .95, .9), dark, 0, 1.5, 1.35);
+  add(new THREE.BoxGeometry(.7, .5, .5), white, 0, 1.28, 1.8);
+  add(new THREE.TorusGeometry(.16, .035, 6, 12), gold, 0, 1.12, 1.98, Math.PI / 2);
+  for (const s of [-1, 1]) {
+    add(new THREE.ConeGeometry(.14, .75, 8), white, s * .55, 2.05, 1.3, 0, -s * .9);
+    add(new THREE.SphereGeometry(.09, 8, 6), red, s * .3, 1.65, 1.78);
+    for (const z of [-.7, .7]) { const l = add(new THREE.CylinderGeometry(.12, .1, .85, 8), dark, s * .42, .45, z); l.geometry.translate(0, -.1, 0); legs.push(l); }
+  }
+  add(new THREE.CylinderGeometry(.04, .04, .9, 6), dark, 0, 1.2, -1.2, .6);
+  g.userData.legs = legs; g.scale.setScalar(1.15); return g;
+}
+async function bullEvent(e) {
+  const bulls = e.lanes.map((L) => { const b = makeBull(), p0 = cellXZ(L.ids[0]); b.position.set(p0.x, 0, p0.z); b.rotation.y = L.dir > 0 ? Math.PI / 2 : -Math.PI / 2; b.scale.setScalar(.01); scene.add(b); return b; });
+  for (const L of e.lanes) for (const h of L.hits) pm[h.pid].busy = true;
+  await tween(.45, (u) => bulls.forEach(b => b.scale.setScalar(Math.max(.01, 1.15 * u))), easeOut);
+  const flown = new Set(), pts = e.lanes.map(L => L.ids.map(cellXZ));
+  const flyOff = (pid, dir) => {
+    const m = pm[pid], x0 = m.g.position.x, z0 = m.g.position.z, zs = (Math.random() - .5) * 8; if (typeof SND !== 'undefined') SND.sfx('bump');
+    tween(.95, (u) => { m.g.position.set(x0 + dir * 7 * u, .12 + 7 * 4 * u * (1 - u), z0 + zs * u); m.inner.rotation.z = u * 14; m.inner.rotation.x = u * 6; }, t => t)
+      .then(() => { m.g.visible = false; m.inner.rotation.set(0, m.inner.rotation.y, 0); m.cell = -1; m.busy = false; });
+  };
+  await tween(2.6, (u) => {
+    e.lanes.forEach((L, li) => {
+      const n = L.ids.length - 1; if (n < 1) return;
+      const f = u * n, i0 = Math.min(n - 1, Math.floor(f)), a = pts[li][i0], b2 = pts[li][i0 + 1], k = f - i0, bl = bulls[li];
+      bl.position.set(lerp(a.x, b2.x, k), Math.abs(Math.sin(f * 2.2)) * .22, lerp(a.z, b2.z, k));
+      bl.userData.legs.forEach((lg, i) => { lg.rotation.x = Math.sin(f * 4 + i * 1.7) * .8; });
+      for (const h of L.hits) if (!flown.has(h.pid) && f >= h.i - .4) { flown.add(h.pid); flyOff(h.pid, L.dir); }
+    });
+  }, t => t);
+  await sleep(700);
+  await tween(.3, (u) => bulls.forEach(b => b.scale.setScalar(Math.max(.01, 1.15 * (1 - u)))));
+  bulls.forEach(b => scene.remove(b));
+}
+async function swapEvent(e) {
+  const A = pm[e.a], B = pm[e.b], pa = cellXZ(e.ca), pb = cellXZ(e.cb); A.busy = B.busy = true;
+  popEmoji('🚪', pa.x, pa.z, 2.4); popEmoji('🚪', pb.x, pb.z, 2.4);
+  await tween(.4, (u) => { A.g.scale.setScalar(Math.max(.01, 1 - u)); B.g.scale.setScalar(Math.max(.01, 1 - u)); A.g.rotation.y = u * 6; B.g.rotation.y = -u * 6; });
+  A.g.position.set(pb.x, .12, pb.z); B.g.position.set(pa.x, .12, pa.z); A.cell = e.cb; B.cell = e.ca;
+  await tween(.4, (u) => { A.g.scale.setScalar(Math.max(.01, u)); B.g.scale.setScalar(Math.max(.01, u)); A.g.rotation.y = (1 - u) * 6; B.g.rotation.y = -(1 - u) * 6; });
+  A.g.scale.setScalar(1); B.g.scale.setScalar(1); A.g.rotation.y = 0; B.g.rotation.y = 0; A.busy = B.busy = false;
+}
+async function slipEvent(e) {
+  const m = pm[e.pid], x = m.g.position.x, z = m.g.position.z; m.busy = true;
+  popEmoji(e.kind === 'oil' ? '🛢️' : '🍌', x, z, 2.2);
+  await tween(.95, (u) => { m.inner.rotation.z = Math.sin(u * Math.PI * 5) * (1 - u) * 1.0; m.g.position.y = .12 + Math.abs(Math.sin(u * Math.PI * 2)) * .55 * (1 - u); });
+  m.inner.rotation.z = 0; m.g.position.y = .12; m.busy = false;
+}
+
 /* ---------- 棋子 ---------- */
 const SKIN = [0xf6d0b0, 0xe0a97a, 0xc58a5a, 0x8d5a3a], HAIR = [0x2a1a10, 0x5a3a20, 0x111111, 0xc9a050, 0x8a3a1a, 0xaaaaaa];
 const matCache = {}; const M = (c) => matCache[c] || (matCache[c] = lam(c));
@@ -1433,10 +1675,9 @@ function cardFrontTex(card) {
   return canvasTex(512, 720, (g) => {
     g.fillStyle = '#fffdf6'; g.fillRect(0, 0, 512, 720); g.fillStyle = CARD_COL[card.color]; g.fillRect(0, 0, 512, 130);
     g.fillStyle = card.color === 'yellow' ? '#2a2a00' : '#fff'; g.font = '900 60px "Noto Sans TC",sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(card.name, 256, 68);
-    g.font = '170px sans-serif'; g.fillText(card.fav ? '⚽' : '⚠️', 256, 290);
-    g.fillStyle = '#222'; g.font = '700 34px "Noto Sans TC",sans-serif'; const t = card.text; const per = 13; let y = 430;
-    for (let i = 0; i < t.length; i += per) { g.fillText(t.slice(i, i + per), 256, y); y += 46; }
-    g.fillStyle = card.fav ? '#1a9d58' : '#c23232'; roundRect(g, 150, 640, 212, 56, 28); g.fill(); g.fillStyle = '#fff'; g.font = '900 32px "Noto Sans TC",sans-serif'; g.fillText(card.fav ? '有利' : '不利', 256, 670);
+    g.font = '170px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif'; g.fillText(card.icon || '⚽', 256, 290);
+    g.fillStyle = '#222'; g.font = '700 30px "Noto Sans TC",sans-serif'; const t = card.text; const per = 15; let y = 400;
+    for (let i = 0; i < t.length && y < 690; i += per) { g.fillText(t.slice(i, i + per), 256, y); y += 36; }
   });
 }
 function buildDecks() {
@@ -1619,7 +1860,7 @@ function init(cv) {
   let last = performance.now();
   renderer.setAnimationLoop(() => {
     const now = performance.now(), dt = Math.min(.1, (now - last) / 1000); last = now; tNow = now / 1000;
-    tick(now); keyStep(dt); envTick(dt); crowdTick(dt, tNow); qaTick(tNow);
+    tick(now); keyStep(dt); envTick(dt); crowdTick(dt, tNow); qaTick(tNow); fxTick(tNow);
     hlMesh.material.opacity = .42 + .2 * Math.sin(tNow * 5);
     for (const p of pm) if (p.ring.visible) { p.ring.material.opacity = .6 + .4 * Math.sin(tNow * 6 + p.pid); p.ring.scale.setScalar(1 + .06 * Math.sin(tNow * 6)); }
     for (const t of [0, 1]) if (goalGlow[t].visible) goalGlow[t].material.opacity = .35 + .3 * Math.sin(tNow * 6);
@@ -1643,8 +1884,9 @@ function setGoalGlow(team) { goalGlow[0].visible = team === 0; goalGlow[1].visib
 function sync(S) {
   if (S.qa) setQA(S.qa, false);
   for (const P of S.pieces) { const m = pm[P.id]; if (m.busy) continue; placeMesh(m, P.cell); if (P.cell >= 0) m.inner.position.y = 0; }
+  syncFx(S, false);
 }
-function resetAll() { for (const m of pm) { m.busy = false; m.g.visible = false; m.cell = -1; } dice.att.visible = false; dice.def.visible = false; if (coin) coin.visible = false; setHighlights([]); setPick(new Set(), -1); setGoalGlow(-1); }
+function resetAll() { fxSig = ''; if (fxRoot) { scene.remove(fxRoot); fxRoot = null; fxAnim = []; } for (const m of pm) { m.busy = false; m.g.visible = false; m.cell = -1; if (m.dizzy) m.dizzy.visible = false; } dice.att.visible = false; dice.def.visible = false; if (coin) coin.visible = false; setHighlights([]); setPick(new Set(), -1); setGoalGlow(-1); }
 function sideFrom(team) { return { x: team === 0 ? -14 : 14, z: 15.2 }; }
 
 async function hop(m, a, b, dur, h, idx) { m.busy = true; if (typeof SND !== 'undefined') SND.sfx('hop', idx || 0); await tween(dur, (u) => { m.g.position.set(lerp(a.x, b.x, u), .12 + Math.sin(u * Math.PI) * h, lerp(a.z, b.z, u)); }, t => t); }
@@ -1678,16 +1920,22 @@ async function playEvent(e, S) {
     case 'qa': setQA(e.cells, true); break;
     case 'card': await flyCard(E.CARDS[e.id]); break;
     case 'goal': break;
+    case 'fx': syncFx(S, true); break;
+    case 'fxend': syncFx(S, false); break;
+    case 'peel': if (e.team === peelView) { const q = cellXZ(e.cell); popEmoji('🍌', q.x, q.z, 1.8); } syncFx(S, true); break;
+    case 'slip': await slipEvent(e); break;
+    case 'swap': await swapEvent(e); break;
+    case 'bull': await bullEvent(e); break;
   }
 }
-return { init, sync, setQA, playEvent, setHighlights, setPick, setGoalGlow, preset, zoom, resetAll, setMyTeam, burst, sleep, tween, setOnTap: f => { onTap = f; }, cam, pm, get camera() { return camera; }, resizeNow: resize };
+return { setPeelView: t => { peelView = t; fxSig = ''; }, init, sync, setQA, playEvent, setHighlights, setPick, setGoalGlow, preset, zoom, resetAll, setMyTeam, burst, sleep, tween, setOnTap: f => { onTap = f; }, cam, pm, get camera() { return camera; }, resizeNow: resize };
 }
 
 /* ===== 遊戲流程 / 介面 / 連線 ===== */
 (function () {
 'use strict';
 const E = window.OG, $ = id => document.getElementById(id), TN = E.TEAM_NAMES;
-let S = null, cfg = { mode: 'ai', myTeam: 0, goals: 3, aiTeam: 1 }, busy = false, sel = -1, fjSel = -1, gen = 0, pending = null, autoFlip = false, lastCard = null, goalsSetting = 3;
+let S = null, cfg = { mode: 'ai', myTeam: 0, goals: 3, aiTeam: 1 }, busy = false, sel = -1, fjSel = -1, areaSel = -1, swapSel = [], gen = 0, pending = null, autoFlip = false, lastCard = null, goalsSetting = 3;
 let mvKey = null, mvVal = null, lastPrKey = '';
 const myId = Math.random().toString(36).slice(2, 10);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -1735,13 +1983,13 @@ const pieceAt = cell => S.pieces.find(p => p.cell === cell);
 
 /* ---------- 開局 ---------- */
 function startGame(mode, o) {
-  gen++; pending = null; busy = true; sel = -1; fjSel = -1; lastCard = null;
+  gen++; pending = null; busy = true; sel = -1; fjSel = -1; areaSel = -1; swapSel = []; lastCard = null;
   cfg = { mode, myTeam: o.myTeam || 0, goals: o.goals || goalsSetting, aiTeam: 1 };
-  S = o.state || E.newState({ goals: cfg.goals });
+  S = o.state || E.newState({ goals: cfg.goals, local: cfg.mode === 'local' });
   const g = gen;
   wipe(() => {
     if (g !== gen) return;
-    V.resetAll(); V.setMyTeam(cfg.mode === 'online' ? cfg.myTeam : 0); V.cam.user = false; V.preset('tactic', true);
+    V.resetAll(); V.setMyTeam(cfg.mode === 'online' ? cfg.myTeam : 0); V.setPeelView(cfg.mode === 'online' ? cfg.myTeam : 0); V.cam.user = false; V.preset('tactic', true);
     ['menu', 'modeMenu', 'netMenu', 'rulesOv', 'overOv', 'setOv'].forEach(i => show(i, false));
     show('topbar', true); show('panel', true); show('netBadge', cfg.mode === 'online');
     $('log').innerHTML = ''; SND.music('match'); SND.sfx('whistle', 0, .2);
@@ -1792,10 +2040,15 @@ async function playEvents(evs) {
         case 'place': SND.sfx('place'); await V.playEvent(e, S); break;
         case 'card': {
           const c = E.CARDS[e.id]; lastCard = c;
-          $('cardOv').innerHTML = `<div class="cardBox ${c.color}"><h3>${c.name}</h3><p>${TN[e.team]}抽到：${c.text}</p><span class="fav ${c.fav ? 'g' : 'b'}">${c.fav ? '有利' : '不利'}</span></div>`;
+          $('cardOv').innerHTML = `<div class="cardBox ${c.color}"><div class="cIcon">${c.icon}</div><h3>${c.name}</h3><p>${TN[e.team]}抽到：${c.text}</p></div>`;
           const o = $('cardOv'); o.classList.remove('show'); void o.offsetWidth; o.classList.add('show');
-          log(`${TN[e.team]} 抽到【${c.name}】`); SND.sfx('card'); SND.sfx(c.fav ? 'good' : 'bad', 0, 1.0); await V.playEvent(e, S); break;
+          log(`${TN[e.team]} 抽到【${c.name}】`); SND.sfx('card'); SND.sfx('good', 0, 1.0); await V.playEvent(e, S); break;
         }
+        case 'fx': { const nm = { flood: '💦 水炸彈：區域淹水', nosteal: '🕊️ 和平令：區域禁止搶斷', oil: '🛢️ 沙拉油區域生效', barrier: '🛡️ 靈壓牆升起', noqa: '🚫 結界失效' }[e.k]; if (nm) log(nm); SND.sfx(e.k === 'flood' ? 'splash' : e.k === 'barrier' ? 'shield' : e.k === 'oil' ? 'slip' : e.k === 'nosteal' ? 'good' : 'bad'); await V.playEvent(e, S); await sleep(350); break; }
+        case 'peel': SND.sfx('pop'); await V.playEvent(e, S); break;
+        case 'slip': SND.sfx('slip'); await V.playEvent(e, S); break;
+        case 'swap': log('🚪 任意門：兩名球員互換位置'); SND.sfx('swap'); await V.playEvent(e, S); break;
+        case 'bull': log('🐂 鬥牛衝撞！'); SND.sfx('bull'); await V.playEvent(e, S); break;
         case 'over': break;
         default: await V.playEvent(e, S);
       }
@@ -1803,7 +2056,7 @@ async function playEvents(evs) {
   } catch (err) { console.error(err); }
   if (g !== gen) return;
   V.sync(S); busy = false;
-  if (pending) { const p = pending; pending = null; S = p; sel = -1; fjSel = -1; playEvents(S.ev); return; }
+  if (pending) { const p = pending; pending = null; S = p; sel = -1; fjSel = -1; areaSel = -1; swapSel = []; playEvents(S.ev); return; }
   renderUI();
   if (S.phase === 'over') { showOver(); return; }
   maybeAI();
@@ -1812,7 +2065,7 @@ function doAct(a) {
   if (busy || !S) return false;
   const ok = E.act(S, a, S.ctrl);
   if (!ok) { log('這個動作不合法'); return false; }
-  sel = -1; fjSel = -1;
+  sel = -1; fjSel = -1; areaSel = -1; swapSel = [];
   if (cfg.mode === 'online') netSend({ t: 'state', st: S });
   playEvents(S.ev); return true;
 }
@@ -1854,11 +2107,12 @@ function renderUI() {
         pr = `${tag(c)} <b>選擇骰子</b>：進攻骰長距離、防守骰短程與己方半場搶斷`;
         btns = [{ html: '進攻骰 4 · 5 · 6<small>長程；只能在對方半場/中線搶斷</small>', cls: 'att', fn: () => doAct({ t: 'die', type: 'att' }) },
           { html: '防守骰 1 · 2 · 3<small>短程；全場可搶斷、門將搶斷</small>', cls: 'def', fn: () => doAct({ t: 'die', type: 'def' }) }];
+        if (S.gkp[cur.team] && S.pieces[cur.team * 11].cell >= 0) btns.unshift({ html: '🛡️ 發動門將威能<small>門將腳下與左右 3 格靈壓牆 2 回合（不耗回合）</small>', cls: 'pri', fn: () => doAct({ t: 'gkskill' }) });
         break;
       }
       case 'move': {
         const m = getMv(), ctx = cur.ctx || {};
-        const who = cur.forced ? `${tag(c)} 指定 ${tag(cur.team)} 的一枚棋子，強制移動 <b>${cur.steps}</b> 步` :
+        const who = cur.any ? `${tag(c)} 卡牌【${lastCard ? lastCard.name : ''}】：選任一棋子移動 <b>${cur.steps}</b> 步（對手棋子只能被動移動，不能搶斷或得分）` : cur.forced ? `${tag(c)} 指定 ${tag(cur.team)} 的一枚棋子，強制移動 <b>${cur.steps}</b> 步` :
           ctx.kind === 'card' ? `${tag(c)} 卡牌【${lastCard ? lastCard.name : ''}】：移動 <b>${cur.steps}</b> 步` :
           `${tag(c)} ${ctx.die === 'att' ? '進攻骰' : '防守骰'} <b>${cur.steps}</b> 步`;
         for (const k of Object.keys(m)) pick.add(+k);
@@ -1874,14 +2128,14 @@ function renderUI() {
         break;
       }
       case 'respawn': {
-        const P = S.pieces[cur.pid], why = cur.reason === 'steal' ? '被搶斷' : cur.reason === 'goal' ? '進球後歸位' : '罰下期滿回場';
+        const P = S.pieces[cur.pid], why = cur.reason === 'bull' ? '被牛撞飛' : cur.reason === 'steal' ? '被搶斷' : cur.reason === 'goal' ? '進球後歸位' : '罰下期滿回場';
         pr = `${tag(c)} ${pname(cur.pid)} ${why}：點選<b>青色深綠格</b>放回`;
         for (const id of E.respawnCells(S, P)) hl.push({ cell: id, kind: 'dark' });
         break;
       }
       case 'drawq': {
-        const pc = { red: '紅', yellow: '黃', blue: '藍' }[cur.color], pp = { red: 75, yellow: 66, blue: 50 }[cur.color];
-        pr = `${tag(c)} 停在對方半場的<b>${pc}色事件格</b>：要抽${pc}牌嗎？（有利約 ${pp}%）`;
+        const pc = { red: '紅', yellow: '黃', blue: '藍' }[cur.color], hint = { red: '移動步數類', yellow: '戰場配置類', blue: '角色性能類' }[cur.color];
+        pr = `${tag(c)} 停在對方半場的<b>${pc}色事件格</b>：要抽${pc}牌嗎？（${hint}）`;
         btns = [{ html: `🃏 抽${pc}牌`, cls: 'pri', fn: () => doAct({ t: 'draw', yes: true }) }, { html: '不抽', cls: 'ghost', fn: () => doAct({ t: 'draw', yes: false }) }];
         break;
       }
@@ -1900,6 +2154,31 @@ function renderUI() {
         else { pr = `${tag(c)} 快攻啟動：點選<b>空的快攻點</b>`; selP = fjSel; hl.push({ cell: S.pieces[fjSel].cell, kind: 'sel' }); for (const q of S.qa) if (occA[q] === -1) hl.push({ cell: q, kind: 'qa' }); btns = [{ html: '重選棋子', cls: 'ghost', fn: () => { fjSel = -1; renderUI(); } }]; }
         break;
       }
+      case 'area': {
+        const nm = { flood: '💦 水炸彈', nosteal: '🕊️ 和平令', oil: '🛢️ 沙拉油' }[cur.fx];
+        const rule = { flood: '7 格淹水 2 回合，任何球員都無法踏入（不可涵蓋深綠格）', nosteal: '7 格 1 回合內無法搶斷', oil: '7 格 3 回合，踩進的球員下個回合骰點 −2' }[cur.fx];
+        if (areaSel >= 0) {
+          for (const i of E.areaOf(areaSel)) hl.push({ cell: i, kind: cur.fx === 'flood' ? 'dark' : cur.fx === 'nosteal' ? 'move' : 'qa' });
+          hl.push({ cell: areaSel, kind: 'sel' });
+          pr = `${tag(c)} ${nm}：已選定落點（${rule}）<br>可點別格改選，或按「確認」`;
+          btns = [{ html: '✔ 確認', cls: 'pri', fn: () => doAct({ t: 'area', cell: areaSel }) }, { html: '取消選取', cls: 'ghost', fn: () => { areaSel = -1; renderUI(); } }];
+        } else pr = `${tag(c)} ${nm}：點選區域<b>中心格</b>（${rule}）`;
+        break;
+      }
+      case 'peel': {
+        pr = `${tag(c)} 🍌 暗放香蕉皮（還要放 <b>${cur.n}</b> 個）：點選己方半場的<b>空格</b>，只有你看得到`;
+        for (const id of E.peelCells(S, cur.team)) hl.push({ cell: id, kind: 'move' });
+        break;
+      }
+      case 'swap': {
+        for (const p of S.pieces) if (!p.gk && p.cell >= 0) pick.add(p.id);
+        for (const id of swapSel) hl.push({ cell: S.pieces[id].cell, kind: 'sel' });
+        selP = swapSel.length ? swapSel[0] : -1;
+        pr = `${tag(c)} 🚪 任意門：點選<b>兩名球員</b>互換位置（不分敵我，門將除外）　已選 ${swapSel.length}/2`;
+        if (swapSel.length === 2) btns = [{ html: '✔ 確認互換', cls: 'pri', fn: () => doAct({ t: 'swap', a: swapSel[0], b: swapSel[1] }) }, { html: '重選', cls: 'ghost', fn: () => { swapSel = []; renderUI(); } }];
+        else if (swapSel.length === 1) btns = [{ html: '重選', cls: 'ghost', fn: () => { swapSel = []; renderUI(); } }];
+        break;
+      }
       case 'gk': {
         pr = `${tag(c)} 門將調度：點選自己半場<b>空的深綠格</b>`;
         for (const id of E.DARK[cur.team].concat([E.HOME[cur.team]])) if (occA[id] === -1) hl.push({ cell: id, kind: 'dark' });
@@ -1907,11 +2186,22 @@ function renderUI() {
       }
     }
   } else if (ph === 'play') pr = '結算中…';
-  $('prompt').innerHTML = pr; setBtns(btns);
+  $('prompt').innerHTML = pr; setBtns(btns); renderFxHud();
   const pk = pr + '|' + btns.length + '|' + ph + (cur ? cur.k : '');
   if (pk !== lastPrKey) { lastPrKey = pk; const p = $('panelIn'); p.classList.remove('bump'); void p.offsetWidth; p.classList.add('bump'); const a = $('actions'); a.classList.remove('anim'); void a.offsetWidth; a.classList.add('anim'); }
   V.setHighlights(busy ? [] : hl); V.setPick(busy ? new Set() : pick, busy ? -1 : selP); V.setGoalGlow(busy ? -1 : goalT);
   updateNetBadge();
+}
+function renderFxHud() {
+  const el = $('fxHud'); if (!el) return; const L = [];
+  const NM = { flood: '💦 淹水區', nosteal: '🕊️ 和平令', oil: '🛢️ 沙拉油區', barrier: '🛡️ 靈壓牆', noqa: '🚫 結界失效' };
+  for (const f of S.fx || []) L.push(`${NM[f.k]}${(f.k === 'barrier' || f.k === 'noqa') ? '（' + TN[f.team] + '）' : ''} 剩 ${Math.ceil(f.left / 2)} 回合`);
+  for (const t of [0, 1]) if (S.gkp && S.gkp[t]) L.push(`🛡️ ${TN[t]} 持有門將威能`);
+  for (const t of [0, 1]) if (S.slip && S.slip[t]) L.push(`🛢️ ${TN[t]} 腳滑（骰點 −2）`);
+  for (const t of [0, 1]) { const n = S.pieces.filter(p => p.team === t && p.stun > 0).length; if (n) L.push(`🍌 ${TN[t]} ${n} 名球員暫停`); }
+  const vt = cfg.mode === 'online' ? cfg.myTeam : 0, np = (S.peels || []).filter(q => q.team === vt).length;
+  if (cfg.mode !== 'local' && np) L.push(`🍌 你暗放了 ${np} 個香蕉皮`);
+  el.innerHTML = L.map(x => `<span>${x}</span>`).join(''); el.classList.toggle('hide', !L.length);
 }
 function onTap(cell, goal) {
   if (busy || !S || !isMine()) return;
@@ -1928,6 +2218,9 @@ function onTap(cell, goal) {
       if (sel >= 0) { sel = -1; SND.sfx('back'); renderUI(); }
       break;
     }
+    case 'area': if (cell >= 0) { if (E.areaCenters(S, cur.fx).includes(cell)) { areaSel = cell; SND.sfx('select'); renderUI(); } else { SND.sfx('error'); log('這裡不能投擲：範圍不可涵蓋雙方深綠格'); } } break;
+    case 'peel': if (cell >= 0) { if (E.peelCells(S, cur.team).includes(cell)) doAct({ t: 'peel', cell }); else SND.sfx('error'); } break;
+    case 'swap': if (p && !p.gk) { const k = swapSel.indexOf(p.id); if (k >= 0) swapSel.splice(k, 1); else if (swapSel.length < 2) swapSel.push(p.id); SND.sfx('select'); renderUI(); } break;
     case 'respawn': if (cell >= 0) doAct({ t: 'respawn', cell }); break;
     case 'jump': if (cell >= 0) doAct({ t: 'jump', to: cell }); break;
     case 'gk': if (cell >= 0) doAct({ t: 'gk', cell }); break;
@@ -2044,7 +2337,7 @@ function onNetMsg(m, tr) {
   } else if (m.t === 'state' && S && cfg.mode === 'online') {
     if (m.st.seq <= S.seq) return;
     if (busy) { pending = m.st; return; }
-    S = m.st; sel = -1; fjSel = -1; playEvents(S.ev);
+    S = m.st; sel = -1; fjSel = -1; areaSel = -1; swapSel = []; playEvents(S.ev);
   }
 }
 function badCode(id, msg) { const e = $(id === 'hostCode' ? 'hostErr' : 'joinErr'); e.textContent = msg; const i = $(id); i.classList.remove('shakeX'); void i.offsetWidth; i.classList.add('shakeX'); SND.sfx('error'); i.focus(); }
@@ -2122,7 +2415,7 @@ function bind() {
   window.addEventListener('keydown', (e) => {
     if (!S || busy || !isMine()) return;
     if (S.cur && S.cur.k === 'die') { if (e.key === '1') doAct({ t: 'die', type: 'att' }); if (e.key === '2') doAct({ t: 'die', type: 'def' }); }
-    if (e.key === 'Escape' && (sel >= 0 || fjSel >= 0)) { sel = -1; fjSel = -1; renderUI(); }
+    if (e.key === 'Escape' && (sel >= 0 || fjSel >= 0 || areaSel >= 0 || swapSel.length)) { sel = -1; fjSel = -1; areaSel = -1; swapSel = []; renderUI(); }
   });
   document.addEventListener('gesturestart', e => e.preventDefault());
   document.addEventListener('dblclick', e => e.preventDefault());
