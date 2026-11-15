@@ -191,6 +191,14 @@ input.code{width:100%;font-size:30px;letter-spacing:8px;text-align:center;text-t
 input[type=range]{width:100%;margin-top:8px;accent-color:#3ac07c;height:28px}
 #setOv .seg{max-width:140px;margin:0 auto}
 
+#notes{position:fixed;inset:0;z-index:10;pointer-events:none;overflow:hidden}
+.note{position:absolute;transform:translate(-50%,0);width:max-content;max-width:min(300px,82vw);text-align:center;padding:9px 16px 10px;border-radius:14px;color:#fff;background:rgba(10,40,26,.93);border:3px solid #fff;box-shadow:0 6px 22px rgba(0,0,0,.45);opacity:0;animation:noteLife 2s cubic-bezier(.2,.9,.3,1.2) forwards}
+.note small{display:block;font-size:12px;opacity:.85;letter-spacing:1px;margin-bottom:2px}
+.note b{display:block;font-size:clamp(15px,4.2vw,20px);line-height:1.3}
+.note.t0{border-color:#ff6a5a;box-shadow:0 6px 22px rgba(0,0,0,.45),0 0 18px rgba(255,90,70,.55)}
+.note.t1{border-color:#ffd93a;box-shadow:0 6px 22px rgba(0,0,0,.45),0 0 18px rgba(255,217,58,.55)}
+@keyframes noteLife{0%{opacity:0;transform:translate(-50%,16px) scale(.55)}11%{opacity:1;transform:translate(-50%,0) scale(1.06)}16%{transform:translate(-50%,0) scale(1)}88%{opacity:1;transform:translate(-50%,0) scale(1)}100%{opacity:0;transform:translate(-50%,-14px) scale(.85)}}
+
 </style>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -429,6 +437,7 @@ const progress = (t, cell) => (t === 0 ? cells[cell].c : COLS - 1 - cells[cell].
 function occ(S) { const a = new Int16Array(cells.length).fill(-1); for (const p of S.pieces) if (p.cell >= 0) a[p.cell] = p.id; return a; }
 const ev = (S, e) => S.ev.push(e);
 const toast = (S, text) => ev(S, { t: 'toast', text });
+const note = (S, team, text) => ev(S, { t: 'note', team, text });
 
 /* ---------- 快攻點：每個半場 4 個，每回合開始隨機重排（不占深綠格/事件格/門前點/棋子） ---------- */
 const isQA = (S, c) => S.qa.indexOf(c) >= 0;
@@ -558,11 +567,11 @@ function scoreGoal(S, team) {
 }
 function endTurn(S) {
   S.die = null;
-  if (S.bonus[S.turn] > 0) { S.bonus[S.turn]--; toast(S, TEAM_NAMES[S.turn] + ' 再行動一次'); } else S.turn = 1 - S.turn;
+  if (S.bonus[S.turn] > 0) { S.bonus[S.turn]--; toast(S, TEAM_NAMES[S.turn] + ' 再行動一次'); note(S, S.turn, '⏩ 額外回合：再行動一次'); } else S.turn = 1 - S.turn;
   ev(S, { t: 'turn', team: S.turn });
   S.qa = genQA(S); ev(S, { t: 'qa', cells: S.qa.slice() });
   const q = [];
-  for (const p of S.pieces) if (p.team === S.turn && p.off > 0) { p.off--; if (p.off === 0) q.push({ k: 'respawn', team: S.turn, pid: p.id, reason: 'return' }); }
+  for (const p of S.pieces) if (p.team === S.turn && p.off > 0) { p.off--; if (p.off === 0) { q.push({ k: 'respawn', team: S.turn, pid: p.id, reason: 'return' }); note(S, S.turn, '🔁 罰下期滿：球員返回場中'); } }
   q.push({ k: 'die', team: S.turn });
   S.queue.push(...q);
 }
@@ -619,7 +628,7 @@ function applyJump(S, task, tg) {
   const rest = [];
   if (tg.kind === 'steal') {
     const V = S.pieces[tg.victim]; V.cell = -1;
-    ev(S, { t: 'steal', pid: V.id });
+    ev(S, { t: 'steal', pid: V.id }); note(S, V.team, '🛡 球員被搶斷：返回己方綠格');
     rest.push({ k: 'respawn', team: V.team, pid: V.id, reason: 'steal' });
   }
   P.cell = tg.to;
@@ -640,11 +649,11 @@ function applyMove(S, task, pid, oc) {
   if (oc.kind === 'goal') {
     P.cell = -1;
     const over = scoreGoal(S, P.team);
-    if (!over) q.push({ k: 'respawn', team: P.team, pid, reason: 'goal' });
+    if (!over) { q.push({ k: 'respawn', team: P.team, pid, reason: 'goal' }); note(S, P.team, '⚽ 進球！球員返回己方綠格'); }
   } else {
     if (oc.kind === 'steal') {
       const V = S.pieces[oc.victim]; V.cell = -1;
-      ev(S, { t: 'steal', pid: V.id });
+      ev(S, { t: 'steal', pid: V.id }); note(S, V.team, '🛡 球員被搶斷：返回己方綠格');
       q.push({ k: 'respawn', team: V.team, pid: V.id, reason: 'steal' });
     }
     P.cell = oc.to;
@@ -655,6 +664,11 @@ function applyMove(S, task, pid, oc) {
 function applyCard(S, t) {
   const card = CARDS[t.id], d = t.team, o = 1 - d, e = card.e, q = [];
   const cardCtx = n => ({ kind: 'card', steps: n });
+  const NT = { move: [d, `🃏 可移動一枚棋子 ${e.n} 步`], wings: [d, '🃏 兩枚棋子各移動 2 步'], roll: [d, '🃏 重擲進攻骰：棋子照點數移動'], fj: [d, '🃏 可跳到快攻點'], extra: [d, '🃏 本回合結束後再行動一次'],
+    red: [d, '🃏 可罰下對手一名球員'], pk: [d, '🃏 獲得 PK 機會'], gk: [d, '🃏 可調度門將'], oppfree: [o, `🃏 對手送你：可移動一枚棋子 ${e.n} 步`],
+    force: [d, `🃏 失誤！被迫移動一枚棋子 ${e.n} 步`], sendme: [d, '🃏 你一名球員將被罰下'], oppextra: [o, '🃏 獲得額外一個回合'], oppk: [o, '🃏 獲得 PK 機會'] };
+  if (NT[e.k]) note(S, NT[e.k][0], NT[e.k][1]);
+  else if (e.k === 'var' && S.score[o] > 0) note(S, d, '🃏 VAR：取消對手一個進球');
   switch (e.k) {
     case 'move': q.push({ k: 'move', team: d, steps: e.n, ctx: cardCtx(e.n) }); break;
     case 'wings': q.push({ k: 'move', team: d, steps: 2, ctx: cardCtx(2) }, { k: 'move', team: d, steps: 2, ctx: cardCtx(2), exLast: true }); break;
@@ -759,7 +773,7 @@ function act(S, a, who) {
     case 'sendoff': {
       if (!cur || cur.k !== 'sendoff') break;
       const P = S.pieces[a.pid]; if (!P || P.team !== cur.victim || P.gk || P.cell < 0) break;
-      P.cell = -1; P.off = 2; ev(S, { t: 'send', pid: P.id }); toast(S, `${TEAM_NAMES[P.team]} 一名球員被罰下，缺席 2 回合`);
+      P.cell = -1; P.off = 2; ev(S, { t: 'send', pid: P.id }); note(S, P.team, '🟥 球員被紅牌罰下：缺席 2 回合'); toast(S, `${TEAM_NAMES[P.team]} 一名球員被罰下，缺席 2 回合`);
       S.cur = null; ok = true; break;
     }
     case 'fj': {
@@ -1734,6 +1748,24 @@ function startGame(mode, o) {
     playEvents(S.ev);
   });
 }
+function noteAnchor(team) {
+  const W = innerWidth, H = innerHeight; let x = W / 2, y = H / 2;
+  try {
+    const v = new THREE.Vector3(team === 0 ? -13 : 13, 0, 0).project(V.camera);
+    x = (v.x * .5 + .5) * W; y = (-v.y * .5 + .5) * H;
+  } catch (e) { x = team === 0 ? W * .25 : W * .75; }
+  const mx = Math.min(150, W / 2 - 10);
+  return { x: Math.max(mx, Math.min(W - mx, x)), y: Math.max(110, Math.min(H - 200, y)) };
+}
+const noteCount = [0, 0];
+function showNote(team, text) {
+  let box = $('notes'); if (!box) { box = document.createElement('div'); box.id = 'notes'; document.body.appendChild(box); }
+  const a = noteAnchor(team), idx = noteCount[team]++, el = document.createElement('div');
+  el.className = 'note t' + team; el.innerHTML = `<small>${team === 0 ? '🔴 ' : '🟡 '}${TN[team]}</small><b>${text}</b>`;
+  el.style.left = a.x + 'px'; el.style.top = (a.y + (idx % 3) * 74 - 30) + 'px';
+  box.appendChild(el); SND.sfx('whoosh');
+  setTimeout(() => { el.remove(); noteCount[team] = Math.max(0, noteCount[team] - 1); }, 2100);
+}
 async function playEvents(evs) {
   const g = gen; busy = true; renderUI();
   try {
@@ -1752,7 +1784,8 @@ async function playEvents(evs) {
         case 'pk': SND.sfx('dice'); await V.playEvent(e, S); break;
         case 'goal': banner('⚽ GOAL！ ' + TN[e.team] + ' 進球'); log(`${TN[e.team]} 進球！`); SND.sfx('goal'); await sleep(900); break;
         case 'steal': log('搶斷成功！'); SND.sfx('steal'); await V.playEvent(e, S); break;
-        case 'send': banner('🟥 紅牌罰下'); SND.sfx('whistle2'); await V.playEvent(e, S); break;
+        case 'note': showNote(e.team, e.text); await sleep(120); break;
+        case 'send': SND.sfx('whistle2'); await V.playEvent(e, S); break;
         case 'qa': log('⚡ 快攻點重新出現'); await V.playEvent(e, S); break;
         case 'jump': SND.sfx('jump'); await V.playEvent(e, S); break;
         case 'respawn': SND.sfx('pop'); await V.playEvent(e, S); break;
