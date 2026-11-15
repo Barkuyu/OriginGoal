@@ -2274,8 +2274,9 @@ function renderUI() {
       }
       case 'respawn': {
         const P = S.pieces[cur.pid], why = cur.reason === 'bull' ? '被牛撞飛' : cur.reason === 'steal' ? '被搶斷' : cur.reason === 'goal' ? '進球後歸位' : '罰下期滿回場';
-        pr = `${tag(c)} ${pname(cur.pid)} ${why}：點選<b>青色深綠格</b>放回`;
-        for (const id of E.respawnCells(S, P)) hl.push({ cell: id, kind: 'dark' });
+        const rc = E.respawnCells(S, P), toGoal = P.gk && rc.length === 1 && rc[0] === E.HOME[P.team];
+        pr = toGoal ? `${tag(c)} ${pname(cur.pid)} ${why}：門將只能回到<b>自己球門的金色格</b>（點選發光處）` : `${tag(c)} ${pname(cur.pid)} ${why}：點選<b>青色深綠格</b>放回`;
+        for (const id of rc) hl.push({ cell: id, kind: toGoal ? 'goal' : 'dark' });
         break;
       }
       case 'drawq': {
@@ -2368,7 +2369,7 @@ function onTap(cell, goal) {
     case 'peel': if (cell >= 0) { if (E.peelCells(S, cur.team).includes(cell)) doAct({ t: 'peel', cell }); else SND.sfx('error'); } break;
     case 'swap': if (p && !p.gk) { const k = swapSel.indexOf(p.id); if (k >= 0) swapSel.splice(k, 1); else if (swapSel.length < 2) swapSel.push(p.id); SND.sfx('select'); renderUI(); } break;
     case 'pass': if (p && E.passTargets(S, cur.n).includes(p.id)) doAct({ t: 'pass', to: p.id }); else SND.sfx('error'); break;
-    case 'respawn': if (cell >= 0) doAct({ t: 'respawn', cell }); break;
+    case 'respawn': if (cell >= 0 && !E.respawnCells(S, S.pieces[cur.pid]).includes(cell)) { SND.sfx('error'); log(S.pieces[cur.pid].gk ? '門將只能回到自己的球門格（發光處）' : '請點選發光的深綠格'); } else if (cell >= 0) doAct({ t: 'respawn', cell }); break;
     case 'jump': if (cell >= 0) doAct({ t: 'jump', to: cell }); break;
     case 'gk': if (cell >= 0) doAct({ t: 'gk', cell }); break;
     case 'sendoff': if (p && p.team === cur.victim && !p.gk) doAct({ t: 'sendoff', pid: p.id }); break;
