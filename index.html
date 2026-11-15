@@ -244,6 +244,8 @@ input[type=range]{width:100%;margin-top:8px;accent-color:#3ac07c;height:28px}
     <div class="secT">🔊 音訊</div>
     <div class="field"><label>🎵 音樂</label><div class="seg"><button id="tMusic" class="on">開</button></div><input type="range" id="vMusic" min="0" max="100" value="100"></div>
     <div class="field"><label>🔔 音效</label><div class="seg"><button id="tSfx" class="on">開</button></div><input type="range" id="vSfx" min="0" max="100" value="100"></div>
+    <div class="secT">🖥 顯示</div>
+    <div class="field"><label>全螢幕</label><div class="seg"><button id="btnFs">關</button></div></div>
     <div id="setCam">
       <div class="secT">🎥 3D 視角</div>
       <div class="grid3">
@@ -1985,11 +1987,20 @@ function bind() {
   $('vMusic').oninput = () => { SND.init(); SND.setMusicVol($('vMusic').value / 100); if (!SND.musicOn) { SND.setMusic(true); syncSnd(); } SND.music(S ? 'match' : 'menu'); };
   $('vSfx').onchange = () => { SND.init(); SND.setSfxVol($('vSfx').value / 100); SND.sfx('card'); };
   $('vSfx').oninput = () => { SND.setSfxVol($('vSfx').value / 100); };
-  const openSet = () => { syncSnd(); $('setCam').classList.toggle('hide', !S); $('setMenu').classList.toggle('hide', !S); show('setOv', true); SND.sfx('pop'); };
+  const openSet = () => { syncSnd(); syncFs(); $('setCam').classList.toggle('hide', !S); $('setMenu').classList.toggle('hide', !S); show('setOv', true); SND.sfx('pop'); };
   $('btnSet').onclick = openSet; $('mSet').onclick = openSet;
   $('setClose').onclick = () => show('setOv', false);
   $('setRules').onclick = () => show('rulesOv', true);
   $('setMenu').onclick = () => { show('setOv', false); toMenu(); };
+  const fsEl = () => document.fullscreenElement || document.webkitFullscreenElement;
+  const fsOK = !!(document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen);
+  const syncFs = () => { const b = $('btnFs'); b.textContent = !fsOK ? '不支援' : fsEl() ? '開' : '關'; b.classList.toggle('on', !!fsEl()); };
+  $('btnFs').onclick = () => {
+    if (!fsOK) { log('此瀏覽器不支援全螢幕（iPhone 請用「加入主畫面」開啟）'); SND.sfx('error'); return; }
+    try { if (fsEl()) { (document.exitFullscreen || document.webkitExitFullscreen).call(document); } else { const d = document.documentElement, r = d.requestFullscreen || d.webkitRequestFullscreen, q = r.call(d); if (q && q.catch) q.catch(() => log('全螢幕被瀏覽器拒絕')); } } catch (e) { log('全螢幕失敗'); }
+  };
+  ['fullscreenchange', 'webkitfullscreenchange'].forEach(ev => document.addEventListener(ev, () => { syncFs(); setTimeout(() => window.dispatchEvent(new Event('resize')), 120); }));
+  syncFs();
   $('btnAuto').onclick = () => { autoFlip = !autoFlip; syncSnd(); log(autoFlip ? '已開啟：同機雙人每回合自動換邊' : '已關閉自動換邊'); };
   $('setCam').onclick = (e) => {
     const b = e.target.closest('button[data-cam]'); if (!b) return; const k = b.dataset.cam;
