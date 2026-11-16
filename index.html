@@ -497,6 +497,20 @@ function shotTargets(S, n) {
   }
   return res;
 }
+function shotReport(S, n) {
+  const out = []; if (S.ball < 0) return out; const H = S.pieces[S.ball]; if (H.cell < 0) return out;
+  const th = S.act.thunder === H.id, d = hexFrom(H.cell), o = occ(S), wall = new Set(); for (const f of S.fx) if (f.k === 'barrier') for (const c of f.cells) wall.add(c);
+  GP[H.team].concat([HOME[1 - H.team]]).forEach((tg, i) => {
+    let why = '';
+    if (isHidden(S, H.id)) why = '隱身中不能射門';
+    else if (tg === H.cell) why = '';
+    else if (d[tg] > n) why = '距離不足（' + d[tg] + ' 格 > ' + n + '）';
+    else if (wall.has(tg) || lineCells(H.cell, tg).some(c => wall.has(c))) why = '被靈壓牆擋住';
+    else if (!th && (o[tg] !== -1 || lineCells(H.cell, tg).some(c => o[c] !== -1))) why = '直線上有棋子擋住';
+    out.push({ cell: tg, name: i === 2 ? '中路' : '側邊', ok: !why, why });
+  });
+  return out;
+}
 const ballTeam = S => (S.ball < 0 ? -1 : S.pieces[S.ball].team);
 const isHidden = (S, pid) => S.fx.some(f => f.k === 'stealth' && f.pid === pid);
 const GKID = t => t * 11;
@@ -1118,8 +1132,13 @@ function act(S, a, who) {
       S.cur = null; ok = true; break;
     }
     case 'skill': {
-      if (!cur || cur.k !== 'die') break;
+      if (!cur) break;
       const P = S.pieces[a.pid]; if (!P || P.team !== cur.team || !skillCheck(S, a.pid).ok) break;
+      if (cur.k === 'pass') { // 射門當下也可補發動雷霆穿擊
+        if (S.skills[a.pid] !== 'thunder' || a.pid !== S.ball) break;
+        delete S.skills[a.pid]; doSkill(S, P, 'thunder'); ok = true; break;
+      }
+      if (cur.k !== 'die') break;
       const k = S.skills[a.pid]; delete S.skills[a.pid];
       const extra = doSkill(S, P, k); S.cur = null; S.queue.unshift(...extra, cur); ok = true; break;
     }
@@ -1210,7 +1229,7 @@ function autoAction(S, strat) {
 }
 
 const E = { cells, cid, DARK, genQA, isQA, HOME, GP, CARDS, KINDS, TEAM_NAMES, FORMATIONS, COLS, MID, SQ3,
-  newState, act, advance, reach, hexFrom, passTargets, shotTargets, lineCells, ballTeam, BALL_DIST, areaOf, areaCenters, peelCells, blockedSet, inArea, noQA, gkLocked, FX_DUR, skillCheck, recallCells, fanCells, cloneSpots, isHidden, SKILL_NAMES, pnm, movable, occ, respawnCells, jumpTargets, autoAction, progress, remaining, canSteal };
+  newState, act, advance, reach, hexFrom, passTargets, shotTargets, shotReport, lineCells, ballTeam, BALL_DIST, areaOf, areaCenters, peelCells, blockedSet, inArea, noQA, gkLocked, FX_DUR, skillCheck, recallCells, fanCells, cloneSpots, isHidden, SKILL_NAMES, pnm, movable, occ, respawnCells, jumpTargets, autoAction, progress, remaining, canSteal };
 if (typeof module !== 'undefined' && module.exports) module.exports = E; else G.OG = E;
 })(typeof window !== 'undefined' ? window : globalThis);
 
@@ -1795,7 +1814,20 @@ function syncFx(S, animate) {
   for (const m of pm) { const on = stun.indexOf(m.pid) >= 0; if (on && !m.dizzy) { m.dizzy = emojiSprite('💫', 1.1); m.dizzy.position.y = 2.9; m.g.add(m.dizzy); } if (m.dizzy) m.dizzy.visible = on; }
   applyConceal(S);
 }
+let shotMarks = [], shotKey = '';
+function setShotMarks(list) { // list: [{cell, n}]
+  const key = JSON.stringify(list); if (key === shotKey) return; shotKey = key;
+  for (const m of shotMarks) { scene.remove(m.g); m.g.traverse(o => { if (o.material) { if (o.material.map) o.material.map.dispose(); o.material.dispose(); } }); } shotMarks = [];
+  for (const it of list) {
+    const C = cells[it.cell], g = new THREE.Group();
+    const ring = new THREE.Mesh(new THREE.RingGeometry(.55, .95, 32), new THREE.MeshBasicMaterial({ color: 0xffd54a, transparent: true, opacity: .95, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false })); ring.rotation.x = -Math.PI / 2; ring.position.y = .3; ring.renderOrder = 6; g.add(ring);
+    const disc = new THREE.Mesh(new THREE.CircleGeometry(.9, 28), new THREE.MeshBasicMaterial({ color: 0xffb300, transparent: true, opacity: .45, side: THREE.DoubleSide, depthWrite: false })); disc.rotation.x = -Math.PI / 2; disc.position.y = .27; disc.renderOrder = 5; g.add(disc);
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: canvasTex(128, 128, (c) => { c.fillStyle = '#ffd54a'; c.strokeStyle = '#7a4a00'; c.lineWidth = 8; c.beginPath(); c.arc(64, 64, 52, 0, 7); c.fill(); c.stroke(); c.fillStyle = '#4a2c00'; c.font = '900 70px sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(String(it.n), 64, 70); }), transparent: true, depthWrite: false, depthTest: false })); sp.scale.set(1.5, 1.5, 1); sp.position.y = 2.2; sp.renderOrder = 9; g.add(sp);
+    g.position.set(C.x, 0, C.z); scene.add(g); shotMarks.push({ g, ring, sp });
+  }
+}
 function fxTick(t) {
+  for (const m of shotMarks) { const k = 1 + .18 * Math.sin(t * 6); m.ring.scale.setScalar(k); m.sp.position.y = 2.2 + .25 * Math.sin(t * 4); }
   for (const a of fxAnim) {
     if (a.mat) a.mat.opacity = Math.max(.05, a.base + a.amp * Math.sin(t * a.sp + a.ph));
     else if (a.spr) a.spr.position.y = a.y + (a.small ? .12 : .3) * Math.sin(t * 3 + a.y);
@@ -2386,7 +2418,7 @@ async function playEvent(e, S) {
     case 'bull': await bullEvent(e); break;
   }
 }
-return { setPeelView: t => { peelView = t; fxSig = ''; }, setViewer: t => { if (viewer !== t) { viewer = t; fxSig = ''; } }, setSkillMarks: (arr) => { const n = new Set(arr); if (n.size === skillSet.size && [...n].every(x => skillSet.has(x))) return; skillSet = n; fxSig = ''; }, init, sync, setQA, playEvent, setHighlights, setPick, setGoalGlow, preset, zoom, resetAll, setMyTeam, burst, sleep, tween, setOnTap: f => { onTap = f; }, cam, pm, get camera() { return camera; }, resizeNow: resize };
+return { setShotMarks, setPeelView: t => { peelView = t; fxSig = ''; }, setViewer: t => { if (viewer !== t) { viewer = t; fxSig = ''; } }, setSkillMarks: (arr) => { const n = new Set(arr); if (n.size === skillSet.size && [...n].every(x => skillSet.has(x))) return; skillSet = n; fxSig = ''; }, init, sync, setQA, playEvent, setHighlights, setPick, setGoalGlow, preset, zoom, resetAll, setMyTeam, burst, sleep, tween, setOnTap: f => { onTap = f; }, cam, pm, get camera() { return camera; }, resizeNow: resize };
 }
 
 /* ===== 遊戲流程 / 介面 / 連線 ===== */
@@ -2564,7 +2596,7 @@ function renderUI() {
   $('s0').textContent = S.score[0]; $('s1').textContent = S.score[1]; $('goalsTo').textContent = '先得 ' + S.goals + ' 分';
   const chip = $('turnChip');
   if (S.phase === 'play') { chip.textContent = TN[S.turn] + '回合'; chip.className = 'c' + S.turn; } else { chip.textContent = S.phase === 'over' ? '比賽結束' : S.phase === 'setup' ? '擺棋' : '擲骰'; chip.className = ''; }
-  let hl = [], pick = new Set(), selP = -1, goalT = -1, pr = '', btns = [];
+  let hl = [], pick = new Set(), selP = -1, goalT = -1, pr = '', btns = [], shotMk = [];
   const mine = isMine() && !busy, c = S.ctrl, ph = S.phase, cur = S.cur;
   const waitTxt = () => cfg.mode === 'ai' ? '電腦思考中…' : `等待 ${tag(c)} 操作…`;
   const occA = E.occ(S);
@@ -2597,12 +2629,17 @@ function renderUI() {
         break;
       }
       case 'pass': {
-        const tg = E.passTargets(S, cur.n), st = E.shotTargets(S, cur.n), H = S.pieces[S.ball];
-        pr = `${tag(c)} ⚽ 足球骰 <b>${cur.n}</b>：點選 ${cur.n} 格內的<b>隊友</b>傳球` + (st.length ? '，或點<b>金色球門格</b>直線射門' : '') + `（${pname(H.id)} 持球）`;
+        const tg = E.passTargets(S, cur.n), st = E.shotTargets(S, cur.n), H = S.pieces[S.ball], rep = E.shotReport(S, cur.n);
+        const thHeld = S.skills[H.id] === 'thunder', thOn = S.act.thunder === H.id;
+        pr = `${tag(c)} ⚽ 足球骰 <b>${cur.n}</b>（${pname(H.id)} 持球）：點<b>隊友</b>傳球` + (st.length ? '，或點<b>發光的金色編號圈</b>／按下方「射門」按鈕' : '，目前<b>無法射門</b>');
+        if (thOn) pr += '<br>⚡ 雷霆穿擊已發動：射門可無視直線上的棋子';
+        else if (!st.length || rep.some(r => !r.ok)) { const bad = rep.filter(r => !r.ok && r.why).map(r => r.name + '：' + r.why); if (bad.length) pr += `<br><small>${bad.join('；')}</small>`; }
+        if (thHeld && !thOn) { pr += '<br><b>⚡ 點擊持球的球員</b>可現在發動雷霆穿擊'; pick.add(H.id); }
         for (const id of tg) pick.add(id);
         hl.push({ cell: H.cell, kind: 'sel' });
         for (const id of tg) hl.push({ cell: S.pieces[id].cell, kind: 'move' });
-        for (const cc of st) hl.push({ cell: cc, kind: 'goal' });
+        shotMk = st.map((cc, i) => ({ cell: cc, n: i + 1 }));
+        btns = st.map((cc, i) => ({ html: `⚽ 射門 ${shotMk[i].n}<small>${cc === E.HOME[1 - H.team] ? '球門中路' : '球門側邊'}</small>`, cls: 'pri', fn: () => doAct({ t: 'shoot', cell: cc }) }));
         break;
       }
       case 'move': {
@@ -2696,7 +2733,7 @@ function renderUI() {
   $('prompt').innerHTML = pr; setBtns(btns); renderFxHud();
   const pk = pr + '|' + btns.length + '|' + ph + (cur ? cur.k : '');
   if (pk !== lastPrKey) { lastPrKey = pk; const p = $('panelIn'); p.classList.remove('bump'); void p.offsetWidth; p.classList.add('bump'); const a = $('actions'); a.classList.remove('anim'); void a.offsetWidth; a.classList.add('anim'); }
-  V.setHighlights(busy ? [] : hl); V.setPick(busy ? new Set() : pick, busy ? -1 : selP); V.setGoalGlow(busy ? -1 : goalT);
+  V.setShotMarks(busy ? [] : shotMk); V.setHighlights(busy ? [] : hl); V.setPick(busy ? new Set() : pick, busy ? -1 : selP); V.setGoalGlow(busy ? -1 : goalT);
   updateNetBadge();
 }
 function renderFxHud() {
@@ -2735,7 +2772,16 @@ function onTap(cell, goal) {
     case 'skillpick': if (p && p.team === cur.team && !p.clone && !S.skills[p.id]) doAct({ t: 'skillpick', pid: p.id }); else SND.sfx('error'); break;
     case 'recall': if (cell >= 0) { if (E.recallCells(S, cur.team).includes(cell)) doAct({ t: 'recall', cell }); else SND.sfx('error'); } break;
     case 'swap': if (p && !p.gk && !p.clone && (p.team === cur.team || !E.isHidden(S, p.id))) { const k = swapSel.indexOf(p.id); if (k >= 0) swapSel.splice(k, 1); else if (swapSel.length < 2) swapSel.push(p.id); SND.sfx('select'); renderUI(); } break;
-    case 'pass': if (cell >= 0 && E.shotTargets(S, cur.n).includes(cell)) doAct({ t: 'shoot', cell }); else if (p && E.passTargets(S, cur.n).includes(p.id)) doAct({ t: 'pass', to: p.id }); else SND.sfx('error'); break;
+    case 'pass': {
+      const st = E.shotTargets(S, cur.n);
+      if (p && p.id === S.ball && S.skills[p.id] === 'thunder') { openSkill(p.id); break; }
+      if (cell >= 0 && st.includes(cell)) { doAct({ t: 'shoot', cell }); break; }
+      if (p && E.passTargets(S, cur.n).includes(p.id)) { doAct({ t: 'pass', to: p.id }); break; }
+      // 點在球門附近：自動選最近的可射門點
+      if (cell >= 0 && st.length) { const C0 = E.cells[cell]; let best = -1, bd = 1e9; for (const t of st) { const d = Math.hypot(E.cells[t].x - C0.x, E.cells[t].z - C0.z); if (d < bd) { bd = d; best = t; } } if (bd <= 3.2) { doAct({ t: 'shoot', cell: best }); break; } }
+      if (goal >= 0 && st.length) { doAct({ t: 'shoot', cell: st[0] }); break; }
+      SND.sfx('error'); break;
+    }
     case 'respawn': if (cell >= 0 && !E.respawnCells(S, S.pieces[cur.pid]).includes(cell)) { SND.sfx('error'); log(S.pieces[cur.pid].gk ? '門將只能回到自己的球門格（發光處）' : '請點選發光的深綠格'); } else if (cell >= 0) doAct({ t: 'respawn', cell }); break;
     case 'jump': if (cell >= 0) doAct({ t: 'jump', to: cell }); break;
     case 'gk': if (cell >= 0) doAct({ t: 'gk', cell }); break;
@@ -2748,7 +2794,7 @@ function onTap(cell, goal) {
     }
   }
 }
-$('skYes').onclick = () => { show('skillOv', false); const pid = skillPid; skillPid = -1; if (pid >= 0 && S && S.cur && S.cur.k === 'die' && isMine() && !busy) doAct({ t: 'skill', pid }); };
+$('skYes').onclick = () => { show('skillOv', false); const pid = skillPid; skillPid = -1; if (pid >= 0 && S && S.cur && (S.cur.k === 'die' || S.cur.k === 'pass') && isMine() && !busy) doAct({ t: 'skill', pid }); };
 $('skNo').onclick = () => { skillPid = -1; show('skillOv', false); SND.sfx('back'); };
 function showOver() {
   const w = S.winner; $('overTitle').textContent = `🏆 ${TN[w]} 獲勝！`;
