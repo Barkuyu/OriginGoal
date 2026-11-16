@@ -327,7 +327,7 @@ input[type=range]{width:100%;margin-top:8px;accent-color:#3ac07c;height:28px}
     <h3>開局</h3><ul><li>由電腦<b>擲硬幣</b>決定誰先擺棋；擺完陣再擲一次決定誰先開球。之後每回合才使用骰子，骰子一律擲在場地正中央。</li></ul>
     <h3>一個回合</h3>
     <ul><li><b>選骰</b>：3 顆骰子自選 2 顆再擲，結算順序固定為<b>進攻 → 防守 → 足球</b>。進攻骰（4/5/6）長程；防守骰（1/2/3）短程、己方半場搶斷、門將搶斷；兩顆移動骰可各讓任一己方棋子走該點數。</li>
-    <li><b>⚽ 足球與足球骰</b>：足球一定在某位球員身上（開球時在先攻方的門將），球員會在原地用腳盤球。足球骰（黑白色，4／6／8／10／12／13）只有<b>己方持球</b>時才能選，點數＝傳球／射門距離：持球者周圍 N 格內的隊友都可接球，點選要傳的人，球會沿直線飛過去。N 格內沒有隊友也無法射門就傳丟，球掉給最近的對手。</li>
+    <li><b>⚽ 足球與足球骰</b>：足球一定在某位球員身上（開球時在先攻方的門將），球員會在原地用腳盤球。足球骰（黑白色，4／6／8／10／12／13）只有<b>己方持球</b>時才能選，點數＝傳球／射門距離：傳球沿著以持球者為中心的<b>六個直線方向</b>踢出，N 格內位於這六條直線上的隊友都可以點選接球；<b>若傳球線中間有其他球員（己方或敵方都一樣），球會被第一個擋住的人「截停」</b>，落在他腳下。N 格內六個方向上沒有隊友也無法射門就傳丟，球掉給最近的對手。</li>
     <li><b>同一回合限制</b>：進攻骰與防守骰不可用在同一枚棋子上（避免一回合走超過 6 步）。足球不在己方時也能選足球骰，但必須先用另一顆骰搶斷到球才有效，否則作廢。</li>
     <li><b>骰子使用順序</b>：選 2 顆擲出後，由你決定先用哪一顆（例如先踢球、再移動棋子）。</li>
     <li><b>🥅 射門</b>：用足球骰踢球時，也可以直接射門——持球者到對方球門 3 格（門將格與兩側金色門前點）之一，距離≤骰點、直線上沒有任何棋子（含己方，也含門將）擋住，就算進球；射手留在原地。門將靈壓牆也會擋住射門。</li>
@@ -550,11 +550,31 @@ function skillCheck(S, pid) {
 }
 function giveBall(S, pid, kind) { S.ball = pid; ev(S, { t: 'ball', to: pid, kind }); }
 function loseBall(S, pid, kind) { if (S.ball !== pid) return false; const t = S.pieces[pid].team; giveBall(S, (1 - t) * 11, kind || 'lost'); note(S, 1 - t, '⚽ 足球回到你方門將'); return true; }
-function passTargets(S, n) {
-  const H = S.pieces[S.ball], d = hexFrom(H.cell);
-  if (isHidden(S, H.id)) return [];
-  return S.pieces.filter(p => p.team === H.team && p.id !== H.id && p.cell >= 0 && d[p.cell] <= n && !isHidden(S, p.id)).map(p => p.id);
+// 六個直線方向（立方座標），傳球沿著直線踢出
+const HEX_DIRS = [[1, -1, 0], [1, 0, -1], [0, 1, -1], [-1, 1, 0], [-1, 0, 1], [0, -1, 1]];
+function rayCells(cell, dir, n) {
+  const C = cells[cell], x0 = C.c, z0 = C.r - (C.c - (C.c & 1)) / 2, out = [];
+  for (let k = 1; k <= n; k++) {
+    const x = x0 + HEX_DIRS[dir][0] * k, z = z0 + HEX_DIRS[dir][2] * k, c = x, r = z + (x - (x & 1)) / 2;
+    if (c < 0 || c > 34 || r < 0) break; const id = cid(c, r); if (id < 0) break; out.push(id);
+  }
+  return out;
 }
+// 傳球：沿六個直線方向、距離 ≤ n；線上第一個棋子（不分敵我）會截停足球
+function passInfo(S, n) {
+  const H = S.pieces[S.ball], res = []; if (!H || H.cell < 0 || isHidden(S, H.id)) return res;
+  const o = occ(S);
+  for (let d = 0; d < 6; d++) {
+    let stop = -1;
+    for (const c of rayCells(H.cell, d, n)) {
+      const pid = o[c]; if (pid === -1 || pid === H.id || isHidden(S, pid)) continue;
+      if (stop < 0) stop = pid;
+      if (S.pieces[pid].team === H.team) res.push({ id: pid, stop, dir: d, cut: stop !== pid });
+    }
+  }
+  return res;
+}
+function passTargets(S, n) { return passInfo(S, n).map(r => r.id); }
 const areaOf = c => [c].concat(cells[c].nb);
 const inArea = (S, k, cell) => S.fx.some(f => f.k === k && f.cells.indexOf(cell) >= 0);
 const noQA = (S, team) => S.fx.some(f => f.k === 'noqa' && f.team === team);
@@ -1061,7 +1081,10 @@ function act(S, a, who) {
     case 'pass': {
       if (!cur || cur.k !== 'pass') break;
       if (!passTargets(S, cur.n).includes(a.to)) break;
-      const from = S.ball; ev(S, { t: 'pass', from, to: a.to }); giveBall(S, a.to, 'pass');
+      const from = S.ball, inf = passInfo(S, cur.n).find(r => r.id === a.to), rc = inf.stop, enemy = S.pieces[rc].team !== S.pieces[from].team;
+      ev(S, { t: 'pass', from, to: rc, cut: inf.cut, fail: enemy });
+      giveBall(S, rc, enemy ? 'fumble' : 'pass');
+      if (inf.cut) note(S, S.pieces[rc].team, enemy ? '✋ 傳球被' + pnm(S.pieces[rc]) + ' 截停！球落入對手腳下' : '✋ 傳球被隊友 ' + pnm(S.pieces[rc]) + ' 中途截停');
       S.cur = null; ok = true; break;
     }
     case 'move': {
@@ -1184,7 +1207,7 @@ function autoAction(S, strat) {
     case 'pass': {
       const st = shotTargets(S, c.n); if (st.length && (smart || Math.random() < .5)) return { t: 'shoot', cell: pick(st) };
       if (st.length && !passTargets(S, c.n).length) return { t: 'shoot', cell: pick(st) };
-      const tg = passTargets(S, c.n).map(i => S.pieces[i]); tg.sort((a, b) => progress(c.team, b.cell) - progress(c.team, a.cell)); return { t: 'pass', to: (smart ? (Math.random() < .8 ? tg[0] : pick(tg)) : pick(tg)).id }; }
+      const inf = passInfo(S, c.n), clr = inf.filter(r => !r.cut), tg = (clr.length ? clr : inf).map(r => S.pieces[r.id]); tg.sort((a, b) => progress(c.team, b.cell) - progress(c.team, a.cell)); return { t: 'pass', to: (smart ? (Math.random() < .8 ? tg[0] : pick(tg)) : pick(tg)).id }; }
     case 'move': {
       const m = movable(S, c); let best = null, bv = -1e9;
       for (const pid of Object.keys(m)) {
@@ -1229,7 +1252,7 @@ function autoAction(S, strat) {
 }
 
 const E = { cells, cid, DARK, genQA, isQA, HOME, GP, CARDS, KINDS, TEAM_NAMES, FORMATIONS, COLS, MID, SQ3,
-  newState, act, advance, reach, hexFrom, passTargets, shotTargets, shotReport, lineCells, ballTeam, BALL_DIST, areaOf, areaCenters, peelCells, blockedSet, inArea, noQA, gkLocked, FX_DUR, skillCheck, recallCells, fanCells, cloneSpots, isHidden, SKILL_NAMES, pnm, movable, occ, respawnCells, jumpTargets, autoAction, progress, remaining, canSteal };
+  newState, act, advance, reach, hexFrom, passTargets, passInfo, rayCells, shotTargets, shotReport, lineCells, ballTeam, BALL_DIST, areaOf, areaCenters, peelCells, blockedSet, inArea, noQA, gkLocked, FX_DUR, skillCheck, recallCells, fanCells, cloneSpots, isHidden, SKILL_NAMES, pnm, movable, occ, respawnCells, jumpTargets, autoAction, progress, remaining, canSteal };
 if (typeof module !== 'undefined' && module.exports) module.exports = E; else G.OG = E;
 })(typeof window !== 'undefined' ? window : globalThis);
 
@@ -2629,15 +2652,16 @@ function renderUI() {
         break;
       }
       case 'pass': {
-        const tg = E.passTargets(S, cur.n), st = E.shotTargets(S, cur.n), H = S.pieces[S.ball], rep = E.shotReport(S, cur.n);
+        const pinf = E.passInfo(S, cur.n), tg = pinf.map(r => r.id), st = E.shotTargets(S, cur.n), H = S.pieces[S.ball], rep = E.shotReport(S, cur.n);
         const thHeld = S.skills[H.id] === 'thunder', thOn = S.act.thunder === H.id;
-        pr = `${tag(c)} ⚽ 足球骰 <b>${cur.n}</b>（${pname(H.id)} 持球）：點<b>隊友</b>傳球` + (st.length ? '，或點<b>發光的金色編號圈</b>／按下方「射門」按鈕' : '，目前<b>無法射門</b>');
+        pr = `${tag(c)} ⚽ 足球骰 <b>${cur.n}</b>（${pname(H.id)} 持球）：沿<b>六個直線方向</b>踢出，點<b>隊友</b>傳球（線上有人會被截停）` + (st.length ? '，或點<b>發光的金色編號圈</b>／按下方「射門」按鈕' : '，目前<b>無法射門</b>');
         if (thOn) pr += '<br>⚡ 雷霆穿擊已發動：射門可無視直線上的棋子';
         else if (!st.length || rep.some(r => !r.ok)) { const bad = rep.filter(r => !r.ok && r.why).map(r => r.name + '：' + r.why); if (bad.length) pr += `<br><small>${bad.join('；')}</small>`; }
         if (thHeld && !thOn) { pr += '<br><b>⚡ 點擊持球的球員</b>可現在發動雷霆穿擊'; pick.add(H.id); }
         for (const id of tg) pick.add(id);
         hl.push({ cell: H.cell, kind: 'sel' });
-        for (const id of tg) hl.push({ cell: S.pieces[id].cell, kind: 'move' });
+        for (const r of pinf) hl.push({ cell: S.pieces[r.id].cell, kind: r.cut ? 'qa' : 'move' });
+        for (const r of pinf) if (r.cut) hl.push({ cell: S.pieces[r.stop].cell, kind: 'steal' });
         shotMk = st.map((cc, i) => ({ cell: cc, n: i + 1 }));
         btns = st.map((cc, i) => ({ html: `⚽ 射門 ${shotMk[i].n}<small>${cc === E.HOME[1 - H.team] ? '球門中路' : '球門側邊'}</small>`, cls: 'pri', fn: () => doAct({ t: 'shoot', cell: cc }) }));
         break;
