@@ -328,6 +328,7 @@ input[type=range]{width:100%;margin-top:8px;accent-color:#3ac07c;height:28px}
     <h3>一個回合</h3>
     <ul><li><b>選骰</b>：3 顆骰子自選 2 顆再擲，結算順序固定為<b>進攻 → 防守 → 足球</b>。進攻骰（4/5/6）長程；防守骰（1/2/3）短程、己方半場搶斷、門將搶斷；兩顆移動骰可各讓任一己方棋子走該點數。</li>
     <li><b>⚽ 足球與足球骰</b>：足球一定在某位球員身上（開球時在先攻方的門將），球員會在原地用腳盤球。足球骰（黑白色，4／6／8／10／12／13）只有<b>己方持球</b>時才能選，點數＝傳球／射門距離：持球者周圍 N 格內的隊友都可接球，點選要傳的人，球會沿直線飛過去。N 格內沒有隊友也無法射門就傳丟，球掉給最近的對手。</li>
+    <li><b>同一回合限制</b>：進攻骰與防守骰不可用在同一枚棋子上（避免一回合走超過 6 步）。足球不在己方時也能選足球骰，但必須先用另一顆骰搶斷到球才有效，否則作廢。</li>
     <li><b>骰子使用順序</b>：選 2 顆擲出後，由你決定先用哪一顆（例如先踢球、再移動棋子）。</li>
     <li><b>🥅 射門</b>：用足球骰踢球時，也可以直接射門——持球者到對方球門 3 格（門將格與兩側金色門前點）之一，距離≤骰點、直線上沒有任何棋子（含己方，也含門將）擋住，就算進球；射手留在原地。門將靈壓牆也會擋住射門。</li>
     <li><b>得分</b>：<b>持球的棋子</b>走進對方得分區，或用足球骰<b>直線射進球門</b>才算進球；沒帶球不能得分。進球後該棋子回己方綠格，球交給對方門將，換對方先攻。持球者被搶斷，球就歸搶斷者；被鬥牛撞飛或被任意門互換，球回到對方門將。</li>
@@ -342,7 +343,7 @@ input[type=range]{width:100%;margin-top:8px;accent-color:#3ac07c;height:28px}
     <ul><li>在<b>對方半場</b>的紅、黃、藍事件格停下（含搶斷後），可選擇抽同色牌：<b>紅卡 19 張（移動步數類）</b>、<b>黃卡 15 張（戰場配置、戰況類）</b>、<b>藍卡 2 張（角色性能類）</b>。</li>
     <li>紅：長驅直入、兩翼齊飛、快攻啟動、連攻戰術、進攻重擲、頂上功夫、再次行動、戰術失誤、失算控球、門將調度。</li>
     <li>黃：結界失效、獎盃回收、鬥牛陣、香蕉皮、水炸彈、任意門、和平令、沙拉油。</li>
-    <li>藍：門將威能（自己回合開始時可發動：門將腳下與左右共 3 格出現靈壓牆 2 回合，任何球員無法穿越）。</li>
+    <li>藍：門將威能（自己回合開始時可發動：門將腳下與左右共 3 格出現靈壓牆 1 回合，任何球員無法穿越）。</li>
     <li>區域類效果以「回合」計：雙方各行動一次算一回合。畫面右上角會列出目前生效中的效果。</li></ul>
     <h3>PK</h3><ul><li>主罰與防守方各擲「進攻骰＋防守骰」相加，<b>主罰必須嚴格大於</b>防守方才進球。</li></ul>
     <h3>3D 視角操作</h3>
@@ -429,7 +430,7 @@ const KINDS = {
   swap: { name: '任意門', icon: '🚪', text: '指定兩名球員互換位置（不分敵我，門將除外）', e: { k: 'swap' } },
   peace: { name: '和平令', icon: '🕊️', text: '指定一格，連同周圍共 7 格，1 回合內無法搶斷', e: { k: 'area', fx: 'nosteal' } },
   oil: { name: '沙拉油', icon: '🛢️', text: '指定一格，連同周圍共 7 格持續 3 回合；踩進的球員下個回合所有骰點 −2', e: { k: 'area', fx: 'oil' } },
-  gkpow: { name: '門將威能', icon: '🛡️', text: '門將獲得一次主動技能（自己回合可發動）：腳下與左右共 3 格出現靈壓牆 2 回合，任何球員都無法穿越；期間門將不可自行移動', e: { k: 'gkpow' } }
+  gkpow: { name: '門將威能', icon: '🛡️', text: '門將獲得一次主動技能（自己回合可發動）：腳下與左右共 3 格出現靈壓牆 1 回合，任何球員都無法穿越；期間門將不可自行移動', e: { k: 'gkpow' } }
 };
 const COMP = {
   red: { long3: 2, wings: 2, fj: 2, chain: 2, roll: 2, headpk: 2, extra: 1, force3: 2, oppextra: 2, gk: 2 },
@@ -521,7 +522,7 @@ function newState(cfg) {
     v: 1, seq: 0, goals: cfg.goals || 3, phase: 'setup', turn: 0, ctrl: 0,
     score: [0, 0], pieces: [], decks: {}, queue: [], cur: null, bonus: [0, 0], ev: [],
     winner: -1, setup: { first: 0 }, lastMoved: -1, die: null,
-    local: !!cfg.local, ball: -1, tc: 0, fx: [], peels: [], slip: [0, 0], gkp: [false, false]
+    local: !!cfg.local, ball: -1, turnMoved: [], tc: 0, fx: [], peels: [], slip: [0, 0], gkp: [false, false]
   };
   for (let t = 0; t < 2; t++)
     for (let i = 0; i < 11; i++) S.pieces.push({ id: t * 11 + i, team: t, gk: i === 0, cell: i === 0 ? HOME[t] : -1, off: 0, stun: 0 });
@@ -594,6 +595,7 @@ function movable(S, task, occA) {
     const eff = !!task.forced || (!!task.any && p.team !== task.team); // 被指定移動的棋子不受暫停/靈壓限制
     if (!eff && (p.stun > 0 || (p.gk && gkLocked(S, p.team)))) continue;
     if (task.exLast && p.id === S.lastMoved) continue;
+    if (task.noRepeat && S.turnMoved.indexOf(p.id) >= 0) continue; // 同一輪進攻骰與防守骰不可用在同一棋子
     const r = reach(S, p.id, task, occA);
     if (r.length) res[p.id] = r;
   }
@@ -631,7 +633,7 @@ function scoreGoal(S, team) {
   return false;
 }
 function endTurn(S) {
-  S.die = null;
+  S.die = null; S.turnMoved = [];
   if (S.bonus[S.turn] > 0) { S.bonus[S.turn]--; toast(S, TEAM_NAMES[S.turn] + ' 再行動一次'); note(S, S.turn, '⏩ 額外回合：再行動一次'); }
   else {
     const L = S.turn;
@@ -688,7 +690,7 @@ function runTask(S, t) {
     }
     case 'order': setCur(S, t, t.team); break;
     case 'pass': {
-      if (ballTeam(S) !== t.team) { toast(S, '足球不在己方，足球骰略過'); break; }
+      if (ballTeam(S) !== t.team) { toast(S, '足球不在己方，足球骰作廢（浪費）'); note(S, t.team, '⚽ 足球不在己方：足球骰作廢'); break; }
       const tg = passTargets(S, t.n), st = shotTargets(S, t.n);
       if (!tg.length && !st.length) {
         const H = S.pieces[S.ball], d = hexFrom(H.cell), opp = S.pieces.filter(p => p.team !== H.team && p.cell >= 0).sort((a, b) => d[a.cell] - d[b.cell])[0];
@@ -749,7 +751,7 @@ function landEffects(S, P, task) {
 function applyMove(S, task, pid, oc) {
   const P = S.pieces[pid];
   let path = oc.path.slice();
-  S.lastMoved = pid; S.cur = null;
+  S.lastMoved = pid; S.cur = null; if (task.noRepeat) S.turnMoved.push(pid);
   // 香蕉皮：路上第一個香蕉皮 → 停在該格跌倒
   let hit = -1, pe = -1;
   for (let i = 1; i < path.length && hit < 0; i++) { const k = S.peels.findIndex(x => x.cell === path[i]); if (k >= 0) { hit = i; pe = k; } }
@@ -892,7 +894,6 @@ function act(S, a, who) {
     case 'roll': {
       if (!cur || cur.k !== 'die' || !Array.isArray(a.dice) || a.dice.length !== 2) break;
       const ds = a.dice; if (ds[0] === ds[1] || ds.some(x => ['att', 'def', 'ball'].indexOf(x) < 0)) break;
-      if (ds.includes('ball') && ballTeam(S) !== cur.team) break;
       const res = ds.map(k => ({ type: k, val: k === 'att' ? rollAtt() : k === 'def' ? rollDef() : BALL_DIST[ri(0, 5)] }));
       S.die = { dice: res, team: cur.team }; ev(S, { t: 'rolls', team: cur.team, dice: res });
       S.cur = null; S.queue.unshift({ k: 'order', team: cur.team, dice: res }); ok = true; break;
@@ -903,7 +904,7 @@ function act(S, a, who) {
       const sl = S.slip[cur.team] === 2 ? 2 : 0, mk = (d) => {
         if (d.type === 'ball') return { k: 'pass', team: cur.team, n: d.val };
         const use = Math.max(0, d.val - sl); if (sl) note(S, cur.team, `🛢️ 腳滑：${d.type === 'att' ? '進攻' : '防守'}骰 ${d.val} → ${use}`);
-        return { k: 'move', team: cur.team, steps: use, ctx: { kind: 'die', die: d.type, steps: d.val } };
+        return { k: 'move', team: cur.team, steps: use, noRepeat: true, ctx: { kind: 'die', die: d.type, steps: d.val } };
       };
       const list = [first].concat(cur.dice.filter(d => d !== first)).map(mk);
       S.cur = null; S.queue.unshift(...list); ok = true; break;
@@ -926,6 +927,7 @@ function act(S, a, who) {
       if (!cur || cur.k !== 'move') break;
       const P = S.pieces[a.pid]; if (!P || (!cur.any && P.team !== cur.team) || P.cell < 0) break;
       if (cur.exLast && P.id === S.lastMoved) break;
+      if (cur.noRepeat && S.turnMoved.indexOf(P.id) >= 0) break;
       if (!movable(S, cur)[a.pid]) break;
       const oc = reach(S, a.pid, cur, occ(S)).find(o => o.kind === a.kind && o.to === a.to);
       if (!oc) break; applyMove(S, cur, a.pid, oc); ok = true; break;
@@ -988,8 +990,8 @@ function act(S, a, who) {
       if (!cur || cur.k !== 'die' || !S.gkp[cur.team]) break;
       const G = S.pieces[cur.team * 11]; if (G.cell < 0) break;
       const gc = cells[G.cell], cl = [G.cell].concat(gc.nb.filter(n => cells[n].c === gc.c));
-      S.fx.push({ k: 'barrier', cells: cl, left: 4, team: cur.team }); S.gkp[cur.team] = false;
-      ev(S, { t: 'fx', k: 'barrier' }); note(S, cur.team, '🛡️ 門將威能發動：靈壓牆 2 回合'); ok = true; break;
+      S.fx.push({ k: 'barrier', cells: cl, left: 2, team: cur.team }); S.gkp[cur.team] = false;
+      ev(S, { t: 'fx', k: 'barrier' }); note(S, cur.team, '🛡️ 門將威能發動：靈壓牆 1 回合'); ok = true; break;
     }
     case 'gk': {
       if (!cur || cur.k !== 'gk') break;
@@ -2284,14 +2286,13 @@ function renderUI() {
     else switch (cur.k) {
       case 'die': {
         const hasBall = E.ballTeam(S) === cur.team;
-        diceSel = diceSel.filter(k => k !== 'ball' || hasBall);
         const tg = (k, html, cls, dis) => ({ html: (diceSel.includes(k) ? '✔ ' : '') + html, cls: cls + (diceSel.includes(k) ? ' picked' : ''), dis, fn: () => { const i = diceSel.indexOf(k); if (i >= 0) diceSel.splice(i, 1); else { if (diceSel.length >= 2) diceSel.shift(); diceSel.push(k); } SND.sfx('select'); renderUI(); } });
-        pr = `${tag(c)} <b>3 顆骰子自選 2 顆</b>（結算順序：進攻 → 防守 → 足球）<br>已選 ${diceSel.length}/2` + (hasBall ? '' : '　<small>足球不在己方，足球骰不能選</small>');
+        pr = `${tag(c)} <b>3 顆骰子自選 2 顆</b>（擲出後再決定先後）<br>已選 ${diceSel.length}/2` + (hasBall ? '' : '<br><small>足球在對方身上：若先用另一顆骰搶斷到球，足球骰才有效，否則作廢</small>');
         btns = [tg('att', '進攻骰 4·5·6<small>長程；對方半場/中線搶斷</small>', 'att'),
           tg('def', '防守骰 1·2·3<small>短程；全場可搶斷</small>', 'def'),
-          tg('ball', '⚽ 足球骰 5·9·13<small>持球者傳球距離（格）</small>', 'ball', !hasBall),
+          tg('ball', '⚽ 足球骰 4–13<small>傳球／射門距離；球不在己方則作廢</small>', 'ball'),
           { html: '🎲 擲骰', cls: 'pri', dis: diceSel.length !== 2, fn: () => { const d = diceSel.slice(); diceSel = []; doAct({ t: 'roll', dice: d }); } }];
-        if (S.gkp[cur.team] && S.pieces[cur.team * 11].cell >= 0) btns.unshift({ html: '🛡️ 發動門將威能<small>門將腳下與左右 3 格靈壓牆 2 回合（不耗回合）</small>', cls: 'pri', fn: () => doAct({ t: 'gkskill' }) });
+        if (S.gkp[cur.team] && S.pieces[cur.team * 11].cell >= 0) btns.unshift({ html: '🛡️ 發動門將威能<small>門將腳下與左右 3 格靈壓牆 1 回合（不耗回合）</small>', cls: 'pri', fn: () => doAct({ t: 'gkskill' }) });
         break;
       }
       case 'order': {
@@ -2618,7 +2619,7 @@ function bind() {
     if (!S || busy || !isMine()) return;
     if (S.cur && S.cur.k === 'die') {
       const k = { '1': 'att', '2': 'def', '3': 'ball' }[e.key];
-      if (k && (k !== 'ball' || E.ballTeam(S) === S.cur.team)) { const i = diceSel.indexOf(k); if (i >= 0) diceSel.splice(i, 1); else { if (diceSel.length >= 2) diceSel.shift(); diceSel.push(k); } SND.sfx('select'); renderUI(); }
+      if (k) { const i = diceSel.indexOf(k); if (i >= 0) diceSel.splice(i, 1); else { if (diceSel.length >= 2) diceSel.shift(); diceSel.push(k); } SND.sfx('select'); renderUI(); }
       if (e.key === 'Enter' && diceSel.length === 2) { const d = diceSel.slice(); diceSel = []; doAct({ t: 'roll', dice: d }); }
     }
     if (e.key === 'Escape' && (sel >= 0 || fjSel >= 0 || areaSel >= 0 || swapSel.length)) { sel = -1; fjSel = -1; areaSel = -1; swapSel = []; diceSel = []; renderUI(); }
