@@ -340,10 +340,12 @@ input[type=range]{width:100%;margin-top:8px;accent-color:#3ac07c;height:28px}
     <h3>疊人加步</h3><ul><li>走滿點數後終點若是隊友，可再往相鄰格多走一步（可連鎖）。己方占住的快攻點不能當接力站。</li></ul>
     <h3>快攻點（橘色閃光格）</h3><ul><li>每個半場有 4 個快攻點，<b>每個回合開始都會在兩邊隨機重新出現</b>（不會占用深綠格）。落在快攻點會跳到另一個可用快攻點（己方占住的不能選），跳完即停。從對方半場快攻點跳回自己半場快攻點時，可「回跳搶斷」對手。</li></ul>
     <h3>事件卡（紅／黃／藍）</h3>
-    <ul><li>在<b>對方半場</b>的紅、黃、藍事件格停下（含搶斷後），可選擇抽同色牌：<b>紅卡 19 張（移動步數類）</b>、<b>黃卡 15 張（戰場配置、戰況類）</b>、<b>藍卡 2 張（角色性能類）</b>。</li>
+    <ul><li>在<b>對方半場</b>的紅、黃、藍事件格停下（含搶斷後），可選擇抽同色牌：<b>紅卡 19 張（移動步數類）</b>、<b>黃卡 17 張（戰場配置、戰況類）</b>、<b>藍卡 14 張（角色性能類）</b>。</li>
     <li>紅：長驅直入、兩翼齊飛、快攻啟動、連攻戰術、進攻重擲、頂上功夫、再次行動、戰術失誤、失算控球、門將調度。</li>
-    <li>黃：結界失效、獎盃回收、鬥牛陣、香蕉皮、水炸彈、任意門、和平令、沙拉油。</li>
-    <li>藍：門將威能（自己回合開始時可發動：門將腳下與左右共 3 格出現靈壓牆 1 回合，任何球員無法穿越）。</li>
+    <li>黃：結界失效、獎盃回收、鬥牛陣、香蕉皮、捕鼠夾（在對方半場暗放 3 個，只有你看得到；任何球員踩到即停下並暫停 1 回合；同機雙人改為隨機讓對方半場 3 名球員受傷）、水炸彈、任意門、和平令、沙拉油。</li>
+    <li>藍：每張都是「指定己方任一球員持有一次<b>主動技能</b>」，之後在<b>自己回合擲骰前</b>點擊該球員（會發光），確認後才發動：<br>
+      🛡️ 門將威能（門將腳下與左右 3 格靈壓牆 1 回合）｜🦶 步伐壓制（本回合終點是敵人時不搶斷，跳到其身後並使其暈眩 2 回合）｜🥷 隱身術式（隱身 2 回合，對手看不到也無法指定，期間不能傳接球）｜👥 分身秘技（2 個分身出現在對方球場，自動跟著本體步數前進，可被搶斷、可傳接球、踩事件格可抽卡）｜🔮 咒術淨化（前方扇形 5 格，清除使用技能中的敵人並擊退 2 格）｜⚡ 雷霆穿擊（持球時發動，本回合射門無視直線上的棋子）｜🏃‍♂️ 回防機制（瞬間移動到己方球門前 3 格的空格）。</li>
+    <li>帶球走進球門仍然得分：即使球門前有門將或防守者，只要步數足夠就能穿過去進球。</li>
     <li>區域類效果以「回合」計：雙方各行動一次算一回合。畫面右上角會列出目前生效中的效果。</li></ul>
     <h3>PK</h3><ul><li>主罰與防守方各擲「進攻骰＋防守骰」相加，<b>主罰必須嚴格大於</b>防守方才進球。</li></ul>
     <h3>3D 視角操作</h3>
@@ -354,6 +356,14 @@ input[type=range]{width:100%;margin-top:8px;accent-color:#3ac07c;height:28px}
 </div>
 
 <!-- 結束 -->
+<div id="skillOv" class="ov hide">
+  <div class="card" style="text-align:center">
+    <h2 id="skT">✨ 技能</h2>
+    <div class="sub" id="skD"></div>
+    <div class="row"><button class="btn pri" id="skYes">✨ 確認發動</button><button class="btn ghost" id="skNo">先不要</button></div>
+  </div>
+</div>
+
 <div id="overOv" class="ov hide">
   <div class="card" style="text-align:center">
     <h1 id="overTitle">🏆</h1>
@@ -430,12 +440,19 @@ const KINDS = {
   swap: { name: '任意門', icon: '🚪', text: '指定兩名球員互換位置（不分敵我，門將除外）', e: { k: 'swap' } },
   peace: { name: '和平令', icon: '🕊️', text: '指定一格，連同周圍共 7 格，1 回合內無法搶斷', e: { k: 'area', fx: 'nosteal' } },
   oil: { name: '沙拉油', icon: '🛢️', text: '指定一格，連同周圍共 7 格持續 3 回合；踩進的球員下個回合所有骰點 −2', e: { k: 'area', fx: 'oil' } },
-  gkpow: { name: '門將威能', icon: '🛡️', text: '門將獲得一次主動技能（自己回合可發動）：腳下與左右共 3 格出現靈壓牆 1 回合，任何球員都無法穿越；期間門將不可自行移動', e: { k: 'gkpow' } }
+  trap: { name: '捕鼠夾', icon: '🪤', text: '在對方半場暗放 3 個捕鼠夾（只有你看得到）；任何球員踩到即停在原地受傷，暫停 1 回合，捕鼠夾消失。同機雙人：改為隨機讓對方半場 3 名球員受傷暫停 1 回合', e: { k: 'peel', kind: 'trap' } },
+  gkpow: { name: '門將威能', icon: '🛡️', text: '門將獲得一次主動技能（點擊門將發動）：腳下與左右共 3 格出現靈壓牆 1 回合，任何球員都無法穿越；期間門將不可自行移動', e: { k: 'gkpow' } },
+  stepover: { name: '步伐壓制', icon: '🦶', text: '指定一名球員持有主動技能：發動後該球員當回合移動終點若是敵方球員，不搶斷、直接跳過到其身後，並使其暈眩 2 回合', e: { k: 'skill', s: 'stepover' } },
+  stealth: { name: '隱身術式', icon: '🥷', text: '指定一名球員持有主動技能：發動後隱身 2 回合，對手看不到也無法指定（範圍效果除外）；隱身期間不能傳接球。同機雙人：僅實現無法指定（含搶斷）', e: { k: 'skill', s: 'stealth' } },
+  clone: { name: '分身秘技', icon: '👥', text: '指定一名球員持有主動技能：發動後產生 2 個分身隨機出現在對方球場；分身可被搶斷、可傳接球、踩事件格可抽卡，本體因骰子移動時分身自動同步步數（優先向前、朝功能格），傳球仍由你手動', e: { k: 'skill', s: 'clone' } },
+  purify: { name: '咒術淨化', icon: '🔮', text: '指定一名球員持有主動技能：發動後對前方扇形 5 格施放，清除其中正使用技能的敵方球員（隱身、分身、靈壓牆），並將其往後擊退 2 格', e: { k: 'skill', s: 'purify' } },
+  thunder: { name: '雷霆穿擊', icon: '⚡', text: '指定一名球員持有主動技能：持球時發動，本回合足球骰射門可無視直線上的棋子，只要點數夠就能直接射門得分', e: { k: 'skill', s: 'thunder' } },
+  recall: { name: '回防機制', icon: '🏃‍♂️', text: '指定一名球員持有主動技能：發動後瞬間移動到己方球門前 3 格中任一空格', e: { k: 'skill', s: 'recall' } },
 };
 const COMP = {
   red: { long3: 2, wings: 2, fj: 2, chain: 2, roll: 2, headpk: 2, extra: 1, force3: 2, oppextra: 2, gk: 2 },
-  yellow: { noqa: 2, var: 1, bull: 2, peel: 2, flood: 2, swap: 2, peace: 2, oil: 2 },
-  blue: { gkpow: 2 }
+  yellow: { noqa: 2, var: 1, bull: 2, peel: 2, trap: 2, flood: 2, swap: 2, peace: 2, oil: 2 },
+  blue: { gkpow: 2, stepover: 2, stealth: 2, clone: 2, purify: 2, thunder: 2, recall: 2 }
 };
 const FX_DUR = { flood: 4, nosteal: 2, oil: 6 }; // 以「換邊次數」計；2 次 = 1 回合（雙方各行動一次）
 const CARDS = [];
@@ -470,22 +487,59 @@ function lineCells(a, b) {
 // 射門：持球者到對方球門 3 格（中間門將格＋兩側門前點）之一拉直線；距離≤骰點、直線上（含目標格）無任何棋子、不穿過門將靈壓牆
 function shotTargets(S, n) {
   if (S.ball < 0) return [];
-  const H = S.pieces[S.ball]; if (H.cell < 0) return [];
-  const d = hexFrom(H.cell), o = occ(S), wall = new Set(); for (const f of S.fx) if (f.k === 'barrier') for (const c of f.cells) wall.add(c);
+  const H = S.pieces[S.ball]; if (H.cell < 0 || isHidden(S, H.id)) return [];
+  const th = S.act.thunder === H.id, d = hexFrom(H.cell), o = occ(S), wall = new Set(); for (const f of S.fx) if (f.k === 'barrier') for (const c of f.cells) wall.add(c);
   const res = [];
   for (const tg of GP[H.team].concat([HOME[1 - H.team]])) {
-    if (tg === H.cell || d[tg] < 0 || d[tg] > n || o[tg] !== -1 || wall.has(tg)) continue;
-    if (lineCells(H.cell, tg).some(c => o[c] !== -1 || wall.has(c))) continue;
+    if (tg === H.cell || d[tg] < 0 || d[tg] > n || (!th && o[tg] !== -1) || wall.has(tg)) continue;
+    if (lineCells(H.cell, tg).some(c => (!th && o[c] !== -1) || wall.has(c))) continue;
     res.push(tg);
   }
   return res;
 }
 const ballTeam = S => (S.ball < 0 ? -1 : S.pieces[S.ball].team);
+const isHidden = (S, pid) => S.fx.some(f => f.k === 'stealth' && f.pid === pid);
+const GKID = t => t * 11;
+const SKILL_NAMES = { gkwall: '🛡️ 門將威能', stepover: '🦶 步伐壓制', stealth: '🥷 隱身術式', clone: '👥 分身秘技', purify: '🔮 咒術淨化', thunder: '⚡ 雷霆穿擊', recall: '🏃‍♂️ 回防機制' };
+const pnm = p => (p.clone ? '分身' : p.gk ? '門將' : '#' + (p.id % 11 + 1) + ' 球員');
+function stunPiece(S, P, turns) { P.stun = 1; P.stunT = turns || 1; }
+// 移除一枚棋子（分身消失，不回場）
+function dropPiece(S, P) { P.cell = -1; if (P.clone) { P.owner = -1; return false; } return true; }
+function recallCells(S, team) {
+  const o = occ(S), b = blockedSet(S), pts = team === 0 ? [[1, 6], [1, 7], [2, 7]] : [[33, 6], [33, 7], [32, 7]];
+  return pts.map(([c, r]) => cid(c, r)).filter(i => i >= 0 && o[i] === -1 && !b[i]);
+}
+function cloneSpots(S, team) {
+  const o = occ(S), b = blockedSet(S);
+  return cells.filter(C => C.side === 1 - team && !C.dark && C.gp < 0 && C.id !== HOME[1 - team] && o[C.id] === -1 && !b[C.id] && !isQA(S, C.id) && !S.peels.some(p => p.cell === C.id)).map(C => C.id);
+}
+function fanCells(P) {
+  const A = cells[P.cell], sg = P.team === 0 ? 1 : -1, d = hexFrom(P.cell), out = [];
+  for (const C of cells) {
+    if (d[C.id] < 1 || d[C.id] > 2) continue;
+    const dx = (C.x - A.x) * sg, dz = C.z - A.z; if (dx <= 0) continue;
+    if (Math.atan2(Math.abs(dz), dx) * 180 / Math.PI <= 31.5) out.push(C.id);
+  }
+  return out;
+}
+function skillCheck(S, pid) {
+  const P = S.pieces[pid], k = S.skills[pid];
+  if (!P || !k) return { ok: false, why: '這名球員沒有技能' };
+  if (P.cell < 0) return { ok: false, why: '球員不在場上' };
+  switch (k) {
+    case 'thunder': if (S.ball !== pid) return { ok: false, why: '需要持球才能發動雷霆穿擊' }; break;
+    case 'stealth': if (isHidden(S, pid)) return { ok: false, why: '已經在隱身中' }; break;
+    case 'clone': if (cloneSpots(S, P.team).length < 2 || S.pieces.filter(p => p.clone && p.team === P.team && p.owner < 0).length < 2) return { ok: false, why: '現在無法產生分身' }; break;
+    case 'recall': if (!recallCells(S, P.team).length) return { ok: false, why: '球門前 3 格都被佔住了' }; break;
+  }
+  return { ok: true, why: '' };
+}
 function giveBall(S, pid, kind) { S.ball = pid; ev(S, { t: 'ball', to: pid, kind }); }
 function loseBall(S, pid, kind) { if (S.ball !== pid) return false; const t = S.pieces[pid].team; giveBall(S, (1 - t) * 11, kind || 'lost'); note(S, 1 - t, '⚽ 足球回到你方門將'); return true; }
 function passTargets(S, n) {
   const H = S.pieces[S.ball], d = hexFrom(H.cell);
-  return S.pieces.filter(p => p.team === H.team && p.id !== H.id && p.cell >= 0 && d[p.cell] <= n).map(p => p.id);
+  if (isHidden(S, H.id)) return [];
+  return S.pieces.filter(p => p.team === H.team && p.id !== H.id && p.cell >= 0 && d[p.cell] <= n && !isHidden(S, p.id)).map(p => p.id);
 }
 const areaOf = c => [c].concat(cells[c].nb);
 const inArea = (S, k, cell) => S.fx.some(f => f.k === k && f.cells.indexOf(cell) >= 0);
@@ -495,9 +549,9 @@ const ZERO_B = new Uint8Array(cells.length);
 function blockedSet(S) { if (!S.fx.some(f => f.k === 'flood' || f.k === 'barrier')) return ZERO_B; const b = new Uint8Array(cells.length); for (const f of S.fx) if (f.k === 'flood' || f.k === 'barrier') for (const c of f.cells) b[c] = 1; return b; }
 const colCells = []; for (const C of cells) (colCells[C.c] = colCells[C.c] || []).push(C.id);
 function areaCenters(S, fx) { const out = []; for (const C of cells) { if (fx === 'flood' && areaOf(C.id).some(i => cells[i].dark)) continue; out.push(C.id); } return out; }
-function peelCells(S, team) {
-  const o = occ(S), b = blockedSet(S);
-  return cells.filter(C => C.side === team && !C.dark && C.gp < 0 && C.id !== HOME[team] && o[C.id] === -1 && !b[C.id] && !S.peels.some(p => p.cell === C.id)).map(C => C.id);
+function peelCells(S, team, kind) {
+  const o = occ(S), b = blockedSet(S), side = kind === 'trap' ? 1 - team : team;
+  return cells.filter(C => C.side === side && !C.dark && C.gp < 0 && C.id !== HOME[team] && o[C.id] === -1 && !b[C.id] && !S.peels.some(p => p.cell === C.id)).map(C => C.id);
 }
 
 /* ---------- 快攻點：每個半場 4 個，每回合開始隨機重排（不占深綠格/事件格/門前點/棋子） ---------- */
@@ -522,10 +576,11 @@ function newState(cfg) {
     v: 1, seq: 0, goals: cfg.goals || 3, phase: 'setup', turn: 0, ctrl: 0,
     score: [0, 0], pieces: [], decks: {}, queue: [], cur: null, bonus: [0, 0], ev: [],
     winner: -1, setup: { first: 0 }, lastMoved: -1, die: null,
-    local: !!cfg.local, ball: -1, turnMoved: [], tc: 0, fx: [], peels: [], slip: [0, 0], gkp: [false, false]
+    local: !!cfg.local, ball: -1, turnMoved: [], tc: 0, fx: [], peels: [], slip: [0, 0], skills: {}, act: { stepover: -1, thunder: -1 }
   };
   for (let t = 0; t < 2; t++)
     for (let i = 0; i < 11; i++) S.pieces.push({ id: t * 11 + i, team: t, gk: i === 0, cell: i === 0 ? HOME[t] : -1, off: 0, stun: 0 });
+  for (let t = 0; t < 2; t++) for (let i = 0; i < 4; i++) S.pieces.push({ id: 22 + t * 4 + i, team: t, gk: false, clone: true, owner: -1, cell: -1, off: 0, stun: 0 });
   for (const c of ['red', 'yellow', 'blue']) S.decks[c] = shuffle(DECK_IDS[c]);
   S.qa = genQA(S);
   const first = ri(0, 1); S.setup.first = first; S.ctrl = first;
@@ -537,6 +592,7 @@ function newState(cfg) {
 /* ---------- 搶斷判定 ---------- */
 function canSteal(S, P, Q, cell, ctx) {
   if (Q.team === P.team) return false;
+  if (isHidden(S, Q.id)) return false;
   const C = cells[cell];
   if (isQA(S, cell)) return false; // 快攻點上的對手受保護
   if (inArea(S, 'nosteal', cell)) return false; // 和平令
@@ -591,7 +647,8 @@ function movable(S, task, occA) {
   occA = occA || occ(S);
   const res = {};
   for (const p of S.pieces) {
-    if ((!task.any && p.team !== task.team) || p.cell < 0) continue;
+    if ((!task.any && p.team !== task.team) || p.cell < 0 || p.clone) continue;
+    if (p.team !== task.team && isHidden(S, p.id)) continue;
     const eff = !!task.forced || (!!task.any && p.team !== task.team); // 被指定移動的棋子不受暫停/靈壓限制
     if (!eff && (p.stun > 0 || (p.gk && gkLocked(S, p.team)))) continue;
     if (task.exLast && p.id === S.lastMoved) continue;
@@ -615,7 +672,7 @@ function jumpTargets(S, task) {
     if (q === P.cell || b[q]) continue;
     const oc = o[q];
     if (oc === -1) res.push({ to: q, kind: 'move', victim: -1 });
-    else if (S.pieces[oc].team !== P.team && from.side === 1 - P.team && cells[q].side === P.team && !inArea(S, 'nosteal', q))
+    else if (S.pieces[oc].team !== P.team && !isHidden(S, oc) && from.side === 1 - P.team && cells[q].side === P.team && !inArea(S, 'nosteal', q))
       res.push({ to: q, kind: 'steal', victim: oc }); // 回跳搶斷
   }
   return res;
@@ -633,11 +690,11 @@ function scoreGoal(S, team) {
   return false;
 }
 function endTurn(S) {
-  S.die = null; S.turnMoved = [];
+  S.die = null; S.turnMoved = []; S.act = { stepover: -1, thunder: -1 };
   if (S.bonus[S.turn] > 0) { S.bonus[S.turn]--; toast(S, TEAM_NAMES[S.turn] + ' 再行動一次'); note(S, S.turn, '⏩ 額外回合：再行動一次'); }
   else {
     const L = S.turn;
-    for (const p of S.pieces) if (p.team === L && p.stun === 2) p.stun = 0;
+    for (const p of S.pieces) if (p.team === L && p.stun === 2) { p.stunT = (p.stunT || 1) - 1; if (p.stunT <= 0) p.stun = 0; }
     if (S.slip[L] === 2) S.slip[L] = 0;
     S.turn = 1 - S.turn; S.tc++;
     let ended = false;
@@ -652,7 +709,7 @@ function endTurn(S) {
   const q = [];
   for (const p of S.pieces) if (p.team === S.turn && p.off > 0) { p.off--; if (p.off === 0) { q.push({ k: 'respawn', team: S.turn, pid: p.id, reason: 'return' }); note(S, S.turn, '🔁 罰下期滿：球員返回場中'); } }
   if (S.slip[S.turn] === 2) note(S, S.turn, '🛢️ 腳滑：本回合所有骰點 −2');
-  for (const p of S.pieces) if (p.team === S.turn && p.stun === 2 && p.cell >= 0) note(S, S.turn, '🍌 ' + (p.id % 11 === 0 ? '門將' : '#' + (p.id % 11 + 1) + ' 球員') + ' 受傷暫停，本回合不能移動');
+  for (const p of S.pieces) if (p.team === S.turn && p.stun === 2 && p.cell >= 0) note(S, S.turn, '💫 ' + pnm(p) + ' 受傷／暈眩，本回合不能移動');
   q.push({ k: 'die', team: S.turn });
   S.queue.push(...q);
 }
@@ -685,11 +742,12 @@ function runTask(S, t) {
       setCur(S, t, t.chooser !== undefined ? t.chooser : t.team); break;
     }
     case 'sendoff': {
-      const ok = S.pieces.some(p => p.team === t.victim && !p.gk && p.cell >= 0);
+      const ok = S.pieces.some(p => p.team === t.victim && !p.gk && !p.clone && p.cell >= 0);
       if (!ok) break; setCur(S, t, t.chooser); break;
     }
     case 'order': setCur(S, t, t.team); break;
     case 'pass': {
+      if (S.ball >= 0 && isHidden(S, S.ball)) { note(S, t.team, '🥷 隱身中不能傳球：足球骰作廢'); break; }
       if (ballTeam(S) !== t.team) { toast(S, '足球不在己方，足球骰作廢（浪費）'); note(S, t.team, '⚽ 足球不在己方：足球骰作廢'); break; }
       const tg = passTargets(S, t.n), st = shotTargets(S, t.n);
       if (!tg.length && !st.length) {
@@ -701,8 +759,11 @@ function runTask(S, t) {
       setCur(S, t, t.team); break;
     }
     case 'area': setCur(S, t, t.team); break;
-    case 'peel': if (!peelCells(S, t.team).length) { toast(S, '沒有可放香蕉皮的格子'); break; } setCur(S, t, t.team); break;
-    case 'swap': if (S.pieces.filter(p => !p.gk && p.cell >= 0).length < 2) { toast(S, '場上球員不足，無法互換'); break; } setCur(S, t, t.team); break;
+    case 'peel': if (!peelCells(S, t.team, t.kind).length) { toast(S, '沒有可放置的格子'); break; } setCur(S, t, t.team); break;
+    case 'skillpick': if (!S.pieces.some(p => p.team === t.team && p.cell >= 0 && !p.clone && !S.skills[p.id])) { toast(S, '沒有可持有技能的球員'); break; } setCur(S, t, t.team); break;
+    case 'recall': if (!recallCells(S, t.team).length) { toast(S, '球門前沒有空格'); break; } setCur(S, t, t.team); break;
+    case 'cmove': runClones(S, t); break;
+    case 'swap': if (S.pieces.filter(p => !p.gk && !p.clone && p.cell >= 0 && (p.team === t.team || !isHidden(S, p.id))).length < 2) { toast(S, '場上球員不足，無法互換'); break; } setCur(S, t, t.team); break;
     case 'fj': {
       if (noQA(S, t.team)) { toast(S, TEAM_NAMES[t.team] + ' 受到結界失效影響，無法使用快攻'); break; }
       const o = occ(S);
@@ -733,10 +794,10 @@ function applyJump(S, task, tg) {
   const P = S.pieces[task.pid], from = P.cell;
   const rest = [];
   if (tg.kind === 'steal') {
-    const V = S.pieces[tg.victim]; V.cell = -1;
+    const V = S.pieces[tg.victim], rs = dropPiece(S, V);
     if (S.ball === V.id) giveBall(S, P.id, 'steal');
-    ev(S, { t: 'steal', pid: V.id }); note(S, V.team, '🛡 球員被搶斷：返回己方綠格');
-    rest.push({ k: 'respawn', team: V.team, pid: V.id, reason: 'steal' });
+    ev(S, { t: 'steal', pid: V.id }); note(S, V.team, '🛡 球員被搶斷：' + (rs ? '返回己方綠格' : '分身消失'));
+    if (rs) rest.push({ k: 'respawn', team: V.team, pid: V.id, reason: 'steal' });
   }
   P.cell = tg.to;
   ev(S, { t: 'jump', pid: P.id, from, to: tg.to });
@@ -744,7 +805,7 @@ function applyJump(S, task, tg) {
 }
 function landEffects(S, P, task) {
   const C = cells[P.cell], list = [], frc = !!task.forced || (!!task.any && P.team !== task.team);
-  if (isQA(S, P.cell)) { if (!noQA(S, P.team)) list.push({ k: 'jump', team: P.team, pid: P.id, chooser: frc ? (task.forced ? task.chooser : task.team) : undefined }); }
+  if (isQA(S, P.cell)) { if (!noQA(S, P.team) && !P.clone) list.push({ k: 'jump', team: P.team, pid: P.id, chooser: frc ? (task.forced ? task.chooser : task.team) : undefined }); }
   else if (!frc && C.ev && (C.side === 1 - P.team)) list.push({ k: 'drawq', team: P.team, color: C.ev, pid: P.id });
   return list;
 }
@@ -758,24 +819,36 @@ function applyMove(S, task, pid, oc) {
   if (hit >= 0) {
     path = path.slice(0, hit + 1);
     ev(S, { t: 'move', pid, path, goal: false });
-    P.cell = path[hit]; P.stun = 1; S.peels.splice(pe, 1);
-    ev(S, { t: 'slip', pid, kind: 'peel' });
-    note(S, P.team, '🍌 踩到香蕉皮：原地跌倒，暫停 1 回合');
+    const pk = S.peels[pe].kind || 'peel';
+    P.cell = path[hit]; stunPiece(S, P, 1); S.peels.splice(pe, 1);
+    ev(S, { t: 'slip', pid, kind: pk });
+    note(S, P.team, pk === 'trap' ? '🪤 ' + pnm(P) + ' 踩到捕鼠夾：受傷暫停 1 回合' : '🍌 踩到香蕉皮：原地跌倒，暫停 1 回合');
     return;
+  }
+  if (oc.kind === 'steal' && S.act.stepover === pid) {
+    const V = S.pieces[oc.victim], A = cells[path.length > 1 ? path[path.length - 2] : P.cell], B = cells[V.cell], o2 = occ(S), bl = blockedSet(S);
+    const tx = 2 * B.x - A.x, tz = 2 * B.z - A.z;
+    let dest = B.nb.filter(n => o2[n] === -1 && !bl[n] && n !== P.cell).sort((x, y) => ((cells[x].x - tx) ** 2 + (cells[x].z - tz) ** 2) - ((cells[y].x - tx) ** 2 + (cells[y].z - tz) ** 2))[0];
+    if (dest === undefined) dest = o2[A.id] === -1 ? A.id : P.cell;
+    S.act.stepover = -1;
+    stunPiece(S, V, 2);
+    ev(S, { t: 'leap', pid, victim: V.id, path: path.slice(0, -1).concat([V.cell, dest]) });
+    note(S, V.team, '🦶 ' + pnm(V) + ' 被跨越：暈眩 2 回合'); note(S, P.team, '🦶 步伐壓制成功：跳過對手並使其暈眩 2 回合');
+    P.cell = dest; S.queue.unshift(...landEffects(S, P, task)); return;
   }
   ev(S, { t: 'move', pid, path, goal: oc.kind === 'goal' });
   if (path.slice(1).some(c => inArea(S, 'oil', c))) { S.slip[P.team] = Math.max(S.slip[P.team], 1); note(S, P.team, '🛢️ 踩到沙拉油：下個回合所有骰點 −2'); ev(S, { t: 'slip', pid, kind: 'oil' }); }
   const q = [];
   if (oc.kind === 'goal') {
-    P.cell = -1;
+    const rsg = dropPiece(S, P);
     const over = scoreGoal(S, P.team);
-    if (!over) { giveBall(S, (1 - P.team) * 11, 'goal'); S.bonus[P.team] = 0; q.push({ k: 'respawn', team: P.team, pid, reason: 'goal' }); note(S, P.team, '⚽ 進球！球員返回己方綠格'); note(S, 1 - P.team, '⚽ 足球交給你方門將：換你先攻'); }
+    if (!over) { giveBall(S, (1 - P.team) * 11, 'goal'); S.bonus[P.team] = 0; if (rsg) q.push({ k: 'respawn', team: P.team, pid, reason: 'goal' }); note(S, P.team, '⚽ 進球！球員返回己方綠格'); note(S, 1 - P.team, '⚽ 足球交給你方門將：換你先攻'); }
   } else {
     if (oc.kind === 'steal') {
-      const V = S.pieces[oc.victim]; V.cell = -1;
+      const V = S.pieces[oc.victim], rs = dropPiece(S, V);
       if (S.ball === V.id) { giveBall(S, P.id, 'steal'); note(S, P.team, '⚽ 搶到足球！'); }
-      ev(S, { t: 'steal', pid: V.id }); note(S, V.team, '🛡 球員被搶斷：返回己方綠格');
-      q.push({ k: 'respawn', team: V.team, pid: V.id, reason: 'steal' });
+      ev(S, { t: 'steal', pid: V.id }); note(S, V.team, '🛡 ' + (rs ? '球員被搶斷：返回己方綠格' : '分身被搶斷消失'));
+      if (rs) q.push({ k: 'respawn', team: V.team, pid: V.id, reason: 'steal' });
     }
     P.cell = oc.to;
     q.push(...landEffects(S, P, task));
@@ -801,13 +874,64 @@ function bullRush(S, d) {
   for (const L of lanes) L.ids.forEach((id, i) => { const pc = S.pieces.find(p => p.cell === id && !p.gk && !hitSet.has(p.id)); if (pc) { hitSet.add(pc.id); L.hits.push({ pid: pc.id, i }); } });
   ev(S, { t: 'bull', lanes: lanes.map(L => ({ ids: L.ids, dir: L.dir, hits: L.hits })) });
   for (const pid of hitSet) {
-    const P = S.pieces[pid]; P.cell = -1;
+    const P = S.pieces[pid], rs = dropPiece(S, P);
     if (S.ball === pid) loseBall(S, pid, 'lost');
-    note(S, P.team, '🐂 被牛撞飛：返回己方綠格重新落點');
-    q.push({ k: 'respawn', team: P.team, pid, reason: 'bull' });
+    note(S, P.team, rs ? '🐂 被牛撞飛：返回己方綠格重新落點' : '🐂 分身被牛撞散了');
+    if (rs) q.push({ k: 'respawn', team: P.team, pid, reason: 'bull' });
   }
   if (!hitSet.size) toast(S, '鬥牛陣：沒有撞到任何棋子');
   return q;
+}
+function doSkill(S, P, k) {
+  const t = P.team, q = [];
+  ev(S, { t: 'skill', pid: P.id, k });
+  switch (k) {
+    case 'gkwall': { const gc = cells[P.cell], cl = [P.cell].concat(gc.nb.filter(n => cells[n].c === gc.c)); S.fx.push({ k: 'barrier', cells: cl, left: 2, team: t }); ev(S, { t: 'fx', k: 'barrier' }); note(S, t, '🛡️ 門將威能發動：靈壓牆 1 回合'); break; }
+    case 'stepover': S.act.stepover = P.id; note(S, t, '🦶 步伐壓制發動：本回合移動終點是敵人時跳過並使其暈眩'); break;
+    case 'stealth': S.fx.push({ k: 'stealth', pid: P.id, team: t, cells: [], left: 4 }); ev(S, { t: 'fx', k: 'stealth' }); note(S, t, '🥷 隱身術式：隱身 2 回合'); note(S, 1 - t, '🥷 對方有球員隱身了'); break;
+    case 'clone': {
+      const spots = shuffle(cloneSpots(S, t)).slice(0, 2), free = S.pieces.filter(p => p.clone && p.team === t && p.owner < 0).slice(0, 2), pids = [];
+      free.forEach((c, i) => { c.owner = P.id; c.cell = spots[i]; c.stun = 0; pids.push(c.id); });
+      ev(S, { t: 'clone', master: P.id, pids, cells: pids.map(i => S.pieces[i].cell) }); note(S, t, '👥 分身秘技：2 個分身出現在對方球場'); break;
+    }
+    case 'purify': {
+      const fan = fanCells(P), hits = [], sg = t === 0 ? 1 : -1;
+      for (const V of S.pieces) {
+        if (V.team === t || V.cell < 0 || fan.indexOf(V.cell) < 0) continue;
+        const bar = V.gk && S.fx.some(f => f.k === 'barrier' && f.team === V.team), hid = isHidden(S, V.id), cl = V.clone && V.owner >= 0;
+        if (!bar && !hid && !cl) continue;
+        const from = V.cell;
+        if (cl) { if (S.ball === V.id) loseBall(S, V.id, 'lost'); dropPiece(S, V); hits.push({ pid: V.id, from, to: -1, kind: 'clone' }); note(S, V.team, '🔮 分身被淨化消散'); continue; }
+        if (bar) { S.fx = S.fx.filter(f => !(f.k === 'barrier' && f.team === V.team)); hits.push({ pid: V.id, from, to: from, kind: 'gk' }); note(S, V.team, '🔮 門將的靈壓牆被淨化'); continue; }
+        S.fx = S.fx.filter(f => !(f.k === 'stealth' && f.pid === V.id));
+        const o2 = occ(S), bl = blockedSet(S), d = hexFrom(from);
+        let cand = cells.filter(C => d[C.id] >= 1 && d[C.id] <= 2 && o2[C.id] === -1 && !bl[C.id] && C.gp < 0 && C.id !== HOME[0] && C.id !== HOME[1]);
+        const back = cand.filter(C => (C.x - cells[from].x) * sg > 0); if (back.length) cand = back;
+        const to = cand.length ? cand[ri(0, cand.length - 1)].id : from; V.cell = to;
+        hits.push({ pid: V.id, from, to, kind: 'stealth' }); note(S, V.team, '🔮 隱身被淨化並擊退 2 格');
+      }
+      ev(S, { t: 'purify', pid: P.id, cells: fan, hits }); note(S, t, hits.length ? '🔮 咒術淨化命中 ' + hits.length + ' 個目標' : '🔮 咒術淨化：沒有命中目標');
+      break;
+    }
+    case 'thunder': S.act.thunder = P.id; note(S, t, '⚡ 雷霆穿擊：本回合足球骰射門無視直線上的棋子'); break;
+    case 'recall': q.push({ k: 'recall', team: t, pid: P.id }); break;
+  }
+  return q;
+}
+function runClones(S, t) {
+  const keep = S.lastMoved;
+  for (const c of S.pieces.filter(p => p.clone && p.owner === t.master && p.cell >= 0 && p.stun === 0)) {
+    const tk = { k: 'move', team: c.team, steps: t.steps, ctx: t.ctx }, r = reach(S, c.id, tk, occ(S)); if (!r.length) continue;
+    let best = null, bv = -1e9;
+    for (const o of r) {
+      const pr = o.kind === 'goal' ? 34 : progress(c.team, o.to); let v = (pr - progress(c.team, c.cell)) * 2 + Math.random() * 3;
+      if (o.kind === 'goal') v += 10000; else { if (cells[o.to].ev && cells[o.to].side === 1 - c.team) v += 14; if (o.kind === 'steal') v += (S.ball === o.victim ? 300 : 60); if (isQA(S, o.to)) v -= 4; }
+      if (v > bv) { bv = v; best = o; }
+    }
+    if (best) applyMove(S, tk, c.id, best);
+    if (S.phase !== 'play') break;
+  }
+  S.lastMoved = keep;
 }
 function applyCard(S, t) {
   const card = CARDS[t.id], d = t.team, o = 1 - d, e = card.e, q = [];
@@ -828,17 +952,19 @@ function applyCard(S, t) {
     case 'bull': note(S, d, '🐂 鬥牛陣：3 頭牛衝出來了！'); q.push(...bullRush(S, d)); break;
     case 'peel':
       if (S.local) {
-        const pool = shuffle(S.pieces.filter(p => p.team === o && !p.gk && p.cell >= 0 && cells[p.cell].side === o)), n = Math.min(3, pool.length);
-        for (let i = 0; i < n; i++) { pool[i].stun = 1; ev(S, { t: 'slip', pid: pool[i].id, kind: 'sprain' }); }
-        if (n) note(S, o, `🍌 ${n} 名球員踩到香蕉皮扭傷，暫停 1 回合`); else toast(S, '對方半場沒有球員可被香蕉皮影響');
-      } else { q.push({ k: 'peel', team: d, n: 3 }); note(S, d, '🍌 暗放 3 個香蕉皮（只有你看得到）'); }
+        const trap = e.kind === 'trap';
+        const pool = shuffle(S.pieces.filter(p => !p.gk && !p.clone && p.cell >= 0 && (trap ? cells[p.cell].side === o : (p.team === o && cells[p.cell].side === o)))), n = Math.min(3, pool.length);
+        for (let i = 0; i < n; i++) { stunPiece(S, pool[i], 1); ev(S, { t: 'slip', pid: pool[i].id, kind: 'sprain' }); }
+        if (n) note(S, o, `${trap ? '🪤 捕鼠夾' : '🍌 香蕉皮'}：${n} 名球員受傷暫停 1 回合`); else toast(S, '對方半場沒有球員可被影響');
+      } else { q.push({ k: 'peel', team: d, n: 3, kind: e.kind || 'peel' }); note(S, d, e.kind === 'trap' ? '🪤 在對方半場暗放 3 個捕鼠夾（只有你看得到）' : '🍌 暗放 3 個香蕉皮（只有你看得到）'); }
       break;
     case 'area': q.push({ k: 'area', team: d, fx: e.fx, dur: FX_DUR[e.fx] }); note(S, d, { flood: '💦 指定水炸彈落點（7 格淹水）', nosteal: '🕊️ 指定和平令區域（7 格禁止搶斷）', oil: '🛢️ 指定沙拉油區域（7 格）' }[e.fx]); break;
     case 'swap': q.push({ k: 'swap', team: d }); note(S, d, '🚪 任意門：指定兩名球員互換位置'); break;
     case 'gkpow':
-      if (S.gkp[d]) toast(S, TEAM_NAMES[d] + ' 已持有門將威能');
-      else { S.gkp[d] = true; note(S, d, '🛡️ 門將獲得威能：自己回合可發動'); }
+      if (S.skills[GKID(d)]) toast(S, TEAM_NAMES[d] + ' 的門將已持有技能');
+      else { S.skills[GKID(d)] = 'gkwall'; ev(S, { t: 'skillget', pid: GKID(d), k: 'gkwall', team: d }); note(S, d, '🛡️ 門將獲得威能：點擊門將可發動'); }
       break;
+    case 'skill': q.push({ k: 'skillpick', team: d, s: e.s }); note(S, d, '✨ 指定一名球員持有技能：' + SKILL_NAMES[e.s]); break;
   }
   S.queue.unshift(...q);
 }
@@ -849,8 +975,8 @@ const FORMATIONS = [
   { name: '4-3-3', pts: [[4,2],[4,5],[4,9],[4,12],[8,3],[8,7],[8,11],[12,2],[12,7],[12,12]] },
   { name: '4-2-3-1', pts: [[4,2],[4,5],[4,9],[4,12],[7,5],[7,9],[11,3],[11,7],[11,11],[14,7]] }
 ];
-function nextUnplaced(S, t) { return S.pieces.find(p => p.team === t && !p.gk && p.cell < 0 && p.off === 0); }
-function remaining(S, t) { return S.pieces.filter(p => p.team === t && !p.gk && p.cell < 0 && p.off === 0).length; }
+function nextUnplaced(S, t) { return S.pieces.find(p => p.team === t && !p.gk && !p.clone && p.cell < 0 && p.off === 0); }
+function remaining(S, t) { return S.pieces.filter(p => p.team === t && !p.gk && !p.clone && p.cell < 0 && p.off === 0).length; }
 function afterPlace(S, t) {
   const rt = remaining(S, t), ro = remaining(S, 1 - t);
   if (!rt && !ro) {
@@ -912,7 +1038,8 @@ function act(S, a, who) {
     case 'shoot': {
       if (!cur || cur.k !== 'pass' || !shotTargets(S, cur.n).includes(a.cell)) break;
       const H = S.pieces[S.ball], team = H.team;
-      ev(S, { t: 'shoot', from: H.id, cell: a.cell }); note(S, team, '🥅 射門！');
+      const thd = S.act.thunder === H.id; S.act.thunder = -1;
+      ev(S, { t: 'shoot', from: H.id, cell: a.cell, thunder: thd }); note(S, team, thd ? '⚡ 雷霆穿擊！' : '🥅 射門！');
       S.cur = null; const over = scoreGoal(S, team);
       if (!over) { giveBall(S, (1 - team) * 11, 'goal'); S.bonus[team] = 0; note(S, 1 - team, '⚽ 足球交給你方門將：換你先攻'); }
       ok = true; break;
@@ -930,7 +1057,10 @@ function act(S, a, who) {
       if (cur.noRepeat && S.turnMoved.indexOf(P.id) >= 0) break;
       if (!movable(S, cur)[a.pid]) break;
       const oc = reach(S, a.pid, cur, occ(S)).find(o => o.kind === a.kind && o.to === a.to);
-      if (!oc) break; applyMove(S, cur, a.pid, oc); ok = true; break;
+      if (!oc) break;
+      const qb = S.queue.length; applyMove(S, cur, a.pid, oc); ok = true;
+      if (cur.ctx && cur.ctx.kind === 'die' && !P.clone && S.phase === 'play' && S.pieces.some(c => c.clone && c.owner === a.pid && c.cell >= 0)) S.queue.splice(S.queue.length - qb, 0, { k: 'cmove', master: a.pid, steps: cur.steps, ctx: cur.ctx });
+      break;
     }
     case 'jump': {
       if (!cur || cur.k !== 'jump') break;
@@ -954,13 +1084,13 @@ function act(S, a, who) {
     }
     case 'sendoff': {
       if (!cur || cur.k !== 'sendoff') break;
-      const P = S.pieces[a.pid]; if (!P || P.team !== cur.victim || P.gk || P.cell < 0) break;
+      const P = S.pieces[a.pid]; if (!P || P.clone || P.team !== cur.victim || P.gk || P.cell < 0) break;
       P.cell = -1; P.off = 2; loseBall(S, P.id, 'lost'); ev(S, { t: 'send', pid: P.id }); note(S, P.team, '🟥 球員被紅牌罰下：缺席 2 回合'); toast(S, `${TEAM_NAMES[P.team]} 一名球員被罰下，缺席 2 回合`);
       S.cur = null; ok = true; break;
     }
     case 'fj': {
       if (!cur || cur.k !== 'fj') break;
-      const P = S.pieces[a.pid]; if (!P || P.team !== cur.team || P.cell < 0) break;
+      const P = S.pieces[a.pid]; if (!P || P.clone || P.team !== cur.team || P.cell < 0) break;
       if (!S.qa.includes(a.to) || occ(S)[a.to] !== -1 || blockedSet(S)[a.to] || noQA(S, cur.team)) break;
       const from = P.cell; P.cell = a.to; ev(S, { t: 'jump', pid: P.id, from, to: a.to }); S.cur = null; ok = true; break;
     }
@@ -972,26 +1102,37 @@ function act(S, a, who) {
     }
     case 'peel': {
       if (!cur || cur.k !== 'peel') break;
-      if (!peelCells(S, cur.team).includes(a.cell)) break;
-      S.peels.push({ cell: a.cell, team: cur.team }); ev(S, { t: 'peel', cell: a.cell, team: cur.team });
-      S.cur = null; if (cur.n > 1) S.queue.unshift({ k: 'peel', team: cur.team, n: cur.n - 1 });
+      if (!peelCells(S, cur.team, cur.kind).includes(a.cell)) break;
+      S.peels.push({ cell: a.cell, team: cur.team, kind: cur.kind || 'peel' }); ev(S, { t: 'peel', cell: a.cell, team: cur.team, kind: cur.kind || 'peel' });
+      S.cur = null; if (cur.n > 1) S.queue.unshift({ k: 'peel', team: cur.team, n: cur.n - 1, kind: cur.kind });
       ok = true; break;
     }
     case 'swap': {
       if (!cur || cur.k !== 'swap') break;
       const A = S.pieces[a.a], B = S.pieces[a.b];
-      if (!A || !B || A.id === B.id || A.gk || B.gk || A.cell < 0 || B.cell < 0) break;
+      if (!A || !B || A.id === B.id || A.gk || B.gk || A.clone || B.clone || A.cell < 0 || B.cell < 0) break;
+      if ((A.team !== cur.team && isHidden(S, A.id)) || (B.team !== cur.team && isHidden(S, B.id))) break;
       const ca = A.cell, cb = B.cell; A.cell = cb; B.cell = ca;
       ev(S, { t: 'swap', a: A.id, b: B.id, ca, cb });
       if (S.ball === A.id) loseBall(S, A.id, 'lost'); else if (S.ball === B.id) loseBall(S, B.id, 'lost');
       S.cur = null; ok = true; break;
     }
-    case 'gkskill': {
-      if (!cur || cur.k !== 'die' || !S.gkp[cur.team]) break;
-      const G = S.pieces[cur.team * 11]; if (G.cell < 0) break;
-      const gc = cells[G.cell], cl = [G.cell].concat(gc.nb.filter(n => cells[n].c === gc.c));
-      S.fx.push({ k: 'barrier', cells: cl, left: 2, team: cur.team }); S.gkp[cur.team] = false;
-      ev(S, { t: 'fx', k: 'barrier' }); note(S, cur.team, '🛡️ 門將威能發動：靈壓牆 1 回合'); ok = true; break;
+    case 'skill': {
+      if (!cur || cur.k !== 'die') break;
+      const P = S.pieces[a.pid]; if (!P || P.team !== cur.team || !skillCheck(S, a.pid).ok) break;
+      const k = S.skills[a.pid]; delete S.skills[a.pid];
+      const extra = doSkill(S, P, k); S.cur = null; S.queue.unshift(...extra, cur); ok = true; break;
+    }
+    case 'skillpick': {
+      if (!cur || cur.k !== 'skillpick') break;
+      const P = S.pieces[a.pid]; if (!P || P.team !== cur.team || P.cell < 0 || P.clone || S.skills[P.id]) break;
+      S.skills[P.id] = cur.s; ev(S, { t: 'skillget', pid: P.id, k: cur.s, team: cur.team }); note(S, cur.team, '✨ ' + pnm(P) + ' 獲得技能：' + SKILL_NAMES[cur.s] + '（點擊他發動）');
+      S.cur = null; ok = true; break;
+    }
+    case 'recall': {
+      if (!cur || cur.k !== 'recall' || !recallCells(S, cur.team).includes(a.cell)) break;
+      const P = S.pieces[cur.pid], from = P.cell; P.cell = a.cell; ev(S, { t: 'jump', pid: P.id, from, to: a.cell }); note(S, cur.team, '🏃‍♂️ 回防：瞬間移動到球門前');
+      S.cur = null; ok = true; break;
     }
     case 'gk': {
       if (!cur || cur.k !== 'gk') break;
@@ -1011,7 +1152,7 @@ function autoAction(S, strat) {
   const pick = arr => arr[ri(0, arr.length - 1)];
   switch (c.k) {
     case 'die': {
-      if (S.gkp[c.team] && S.pieces[c.team * 11].cell >= 0 && Math.random() < .5) return { t: 'gkskill' };
+      if (Math.random() < (smart ? .45 : .3)) { const l = S.pieces.filter(p => p.team === c.team && S.skills[p.id] && skillCheck(S, p.id).ok); if (l.length) return { t: 'skill', pid: pick(l).id }; }
       const own = ballTeam(S) === c.team;
       if (own && Math.random() < (smart ? .6 : .5)) return { t: 'roll', dice: [Math.random() < .5 ? 'att' : 'def', 'ball'] };
       return { t: 'roll', dice: ['att', 'def'] };
@@ -1049,25 +1190,27 @@ function autoAction(S, strat) {
     case 'drawq': return { t: 'draw', yes: Math.random() < 0.75 };
     case 'jump': { const l = jumpTargets(S, c); const s = l.find(x => x.kind === 'steal'); return { t: 'jump', to: (s || pick(l)).to }; }
     case 'sendoff': {
-      const l = S.pieces.filter(p => p.team === c.victim && !p.gk && p.cell >= 0);
+      const l = S.pieces.filter(p => p.team === c.victim && !p.gk && !p.clone && p.cell >= 0);
       l.sort((a, b) => progress(1 - c.victim, b.cell) - progress(1 - c.victim, a.cell));
       // 要罰下對手時選最有威脅的（離我方球門近）；被指定罰下我方時 AI 選最沒用的
       const mine = c.chooser === c.victim; return { t: 'sendoff', pid: (smart ? (mine ? l[l.length - 1] : l[0]) : pick(l)).id };
     }
     case 'fj': {
-      const o = occ(S), qs = S.qa.filter(q => o[q] === -1), mine = S.pieces.filter(p => p.team === c.team && p.cell >= 0 && !p.gk);
+      const o = occ(S), qs = S.qa.filter(q => o[q] === -1), mine = S.pieces.filter(p => p.team === c.team && p.cell >= 0 && !p.gk && !p.clone);
       return { t: 'fj', pid: pick(mine).id, to: pick(qs) };
     }
     case 'area': return { t: 'area', cell: pick(areaCenters(S, c.fx)) };
-    case 'peel': return { t: 'peel', cell: pick(peelCells(S, c.team)) };
-    case 'swap': { const l = S.pieces.filter(p => !p.gk && p.cell >= 0), A = pick(l); const B = pick(l.filter(p => p.id !== A.id)); return { t: 'swap', a: A.id, b: B.id }; }
+    case 'peel': return { t: 'peel', cell: pick(peelCells(S, c.team, c.kind)) };
+    case 'skillpick': { const l = S.pieces.filter(p => p.team === c.team && p.cell >= 0 && !p.clone && !S.skills[p.id]); return { t: 'skillpick', pid: pick(l).id }; }
+    case 'recall': return { t: 'recall', cell: pick(recallCells(S, c.team)) };
+    case 'swap': { const l = S.pieces.filter(p => !p.gk && !p.clone && p.cell >= 0 && (p.team === c.team || !isHidden(S, p.id))), A = pick(l); const B = pick(l.filter(p => p.id !== A.id)); return { t: 'swap', a: A.id, b: B.id }; }
     case 'gk': { const o = occ(S), l = DARK[c.team].filter(i => o[i] === -1).concat(o[HOME[c.team]] === -1 ? [HOME[c.team]] : []); return { t: 'gk', cell: pick(l) }; }
   }
   return null;
 }
 
 const E = { cells, cid, DARK, genQA, isQA, HOME, GP, CARDS, KINDS, TEAM_NAMES, FORMATIONS, COLS, MID, SQ3,
-  newState, act, advance, reach, hexFrom, passTargets, shotTargets, lineCells, ballTeam, BALL_DIST, areaOf, areaCenters, peelCells, blockedSet, inArea, noQA, gkLocked, FX_DUR, movable, occ, respawnCells, jumpTargets, autoAction, progress, remaining, canSteal };
+  newState, act, advance, reach, hexFrom, passTargets, shotTargets, lineCells, ballTeam, BALL_DIST, areaOf, areaCenters, peelCells, blockedSet, inArea, noQA, gkLocked, FX_DUR, skillCheck, recallCells, fanCells, cloneSpots, isHidden, SKILL_NAMES, pnm, movable, occ, respawnCells, jumpTargets, autoAction, progress, remaining, canSteal };
 if (typeof module !== 'undefined' && module.exports) module.exports = E; else G.OG = E;
 })(typeof window !== 'undefined' ? window : globalThis);
 
@@ -1163,6 +1306,14 @@ const SFX = {
   swap(t) { noise(t, .5, .45, 'bandpass', 800, sg, { to: 3000, q: 3, a: .1 }); osc('sine', 400, t, .5, .25, sg, { to: 1200 }); osc('sine', 1200, t + .45, .25, .2, sg, { to: 400 }); },
   splash(t) { noise(t, .5, .55, 'bandpass', 1200, sg, { to: 300, q: .8, a: .02 }); for (let i = 0; i < 5; i++) osc('sine', 500 + Math.random() * 700, t + .1 + i * .07, .08, .2, sg, { to: 1400 }); },
   shield(t) { for (let i = 0; i < 5; i++) osc('triangle', 500 * Math.pow(1.26, i), t + i * .06, .4, .18, sg); noise(t, .7, .2, 'highpass', 5000, sg, { a: .2 }); },
+  skill(t) { for (let i = 0; i < 4; i++) osc('triangle', 400 * Math.pow(1.335, i), t + i * .07, .45, .2, sg, { to: 400 * Math.pow(1.335, i) * 1.5 }); noise(t, .5, .25, 'highpass', 4000, sg, { a: .15 }); },
+  getskill(t) { osc('sine', 880, t, .18, .25, sg, { to: 1320 }); osc('sine', 1320, t + .12, .3, .22, sg, { to: 1760 }); },
+  thunder(t) { noise(t, 1.4, .8, 'lowpass', 300, sg, { to: 60, a: .02 }); osc('sawtooth', 60, t, 1.3, .5, sg, { to: 35, lp: 200 }); for (let i = 0; i < 3; i++) noise(t + .2 + i * .22, .15, .55, 'highpass', 2500, sg); },
+  zap(t) { noise(t, .25, .7, 'highpass', 3000, sg, { to: 9000, a: .005 }); osc('sawtooth', 900, t, .2, .35, sg, { to: 120, lp: 3000 }); },
+  clone(t) { osc('sine', 300, t, .5, .25, sg, { to: 900 }); osc('sine', 450, t + .08, .5, .22, sg, { to: 1350 }); noise(t, .4, .2, 'bandpass', 2500, sg, { to: 5000, q: 2, a: .1 }); },
+  purify(t) { for (let i = 0; i < 6; i++) osc('sine', 330 * Math.pow(1.19, i), t + i * .1, .6, .17, sg, { to: 330 * Math.pow(1.19, i) * .8 }); osc('sawtooth', 110, t, 1, .2, sg, { to: 220, lp: 600 }); noise(t + .2, .8, .22, 'bandpass', 1500, sg, { to: 400, q: 1.5, a: .2 }); },
+  leap(t) { noise(t, .3, .35, 'bandpass', 700, sg, { to: 2500, q: 1.2, a: .08 }); osc('sine', 260, t, .45, .3, sg, { to: 520 }); osc('sine', 520, t + .4, .15, .35, sg, { to: 130 }); },
+  trap(t) { noise(t, .08, .7, 'highpass', 3000, sg); osc('square', 1500, t, .06, .3, sg, { to: 300, lp: 3000 }); osc('sine', 150, t + .05, .2, .4, sg, { to: 60 }); },
   click(t) { osc('square', 880, t, .06, .18, sg, { to: 1320, lp: 4000 }); osc('sine', 440, t, .05, .2, sg); },
   back(t) { osc('square', 700, t, .08, .16, sg, { to: 420, lp: 3000 }); },
   select(t) { osc('triangle', 660, t, .09, .25, sg, { to: 990 }); },
@@ -1588,7 +1739,21 @@ function qaTick(t) {
 }
 
 /* ---------- 特殊效果：淹水 / 和平令 / 沙拉油 / 靈壓牆 / 香蕉皮 / 暈眩 ---------- */
-let fxRoot = null, fxSig = '', fxAnim = [], peelView = 0, fxGeo = null;
+let fxRoot = null, fxSig = '', fxAnim = [], peelView = 0, fxGeo = null, viewer = -1, skillSet = new Set();
+const isHid = (S, pid) => S.fx.some(f => f.k === 'stealth' && f.pid === pid);
+const concealed = (S, pid) => viewer >= 0 && S.pieces[pid].team !== viewer && isHid(S, pid);
+function applyConceal(S) {
+  for (const P of S.pieces) {
+    const m = pm[P.id]; if (!m) continue;
+    const hid = P.cell >= 0 && isHid(S, P.id), cn = hid && viewer >= 0 && P.team !== viewer;
+    if (!m.busy && P.cell >= 0) m.g.visible = !cn;
+    if (hid && !cn && !m.hidMark) { m.hidMark = emojiSprite('🥷', .95); m.hidMark.position.y = 3.0; m.g.add(m.hidMark); }
+    if (m.hidMark) m.hidMark.visible = hid && !cn;
+    const sk = skillSet.has(P.id) && P.cell >= 0;
+    if (sk && !m.skMark) { m.skMark = emojiSprite('✨', .9); m.skMark.position.set(.65, 2.4, 0); m.g.add(m.skMark); }
+    if (m.skMark) m.skMark.visible = sk;
+  }
+}
 function emojiTex(ch) { return canvasTex(128, 128, (g) => { g.font = '92px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(ch, 64, 70); }); }
 function emojiSprite(ch, size) { const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: emojiTex(ch), transparent: true, depthWrite: false })); sp.scale.set(size, size, 1); sp.renderOrder = 5; return sp; }
 async function popEmoji(ch, x, z, big) {
@@ -1599,7 +1764,7 @@ async function popEmoji(ch, x, z, big) {
 function syncFx(S, animate) {
   if (!S || !S.fx) return;
   const stun = S.pieces.filter(p => p.stun > 0 && p.cell >= 0).map(p => p.id);
-  const sig = JSON.stringify([S.fx.map(f => [f.k, f.cells, f.team]), S.peels.filter(q => q.team === peelView).map(q => q.cell), stun]);
+  const sig = JSON.stringify([S.fx.map(f => [f.k, f.cells, f.team, f.pid]), S.peels.filter(q => q.team === peelView).map(q => [q.cell, q.kind]), stun, viewer, [...skillSet]]);
   if (sig === fxSig) return; fxSig = sig;
   if (!fxGeo) { fxGeo = { hex: new THREE.CylinderGeometry(.93, .93, .07, 6), wall: new THREE.CylinderGeometry(.93, .93, 3, 6) }; fxGeo.hex.rotateY(Math.PI / 6); fxGeo.wall.rotateY(Math.PI / 6); }
   if (fxRoot) { scene.remove(fxRoot); fxRoot.traverse(o => { if (o.material) { if (o.material.map) o.material.map.dispose(); o.material.dispose(); } }); }
@@ -1607,7 +1772,7 @@ function syncFx(S, animate) {
   const STY = { flood: { c: 0x2f9bff, o: .6, amp: .16, em: '💦' }, nosteal: { c: 0xf4fff0, o: .42, amp: .12, em: '🕊️' }, oil: { c: 0x2b1d05, o: .78, amp: .08, em: '🛢️' } };
   const born = [];
   for (const f of S.fx) {
-    if (f.k === 'noqa') continue;
+    if (f.k === 'noqa' || f.k === 'stealth') continue;
     if (f.k === 'barrier') {
       for (const c of f.cells) {
         const C = cells[c], m = new THREE.Mesh(fxGeo.wall, new THREE.MeshBasicMaterial({ color: 0x48b8ff, transparent: true, opacity: .32, depthWrite: false, blending: THREE.AdditiveBlending }));
@@ -1624,10 +1789,11 @@ function syncFx(S, animate) {
     }
     const mid = cells[f.cells[0]], sp = emojiSprite(st.em, 1.5); sp.position.set(mid.x, 1.5, mid.z); fxRoot.add(sp); fxAnim.push({ spr: sp, y: 1.5 });
   }
-  for (const q of S.peels) if (q.team === peelView) { const C = cells[q.cell], sp = emojiSprite('🍌', 1.25); sp.position.set(C.x, .75, C.z); fxRoot.add(sp); born.push(sp); fxAnim.push({ spr: sp, y: .75, small: true }); }
+  for (const q of S.peels) if (q.team === peelView) { const C = cells[q.cell], sp = emojiSprite(q.kind === 'trap' ? '🪤' : '🍌', 1.25); sp.position.set(C.x, .75, C.z); fxRoot.add(sp); born.push(sp); fxAnim.push({ spr: sp, y: .75, small: true }); }
   if (animate) for (const m of born) { const target = m.scale.clone(); m.scale.multiplyScalar(.01); tween(.55, (u) => m.scale.copy(target).multiplyScalar(Math.max(.01, u < .75 ? u / .75 * 1.15 : 1.15 - (u - .75) / .25 * .15)), t => t).then(() => m.scale.copy(target)); }
   // 暈眩標記
   for (const m of pm) { const on = stun.indexOf(m.pid) >= 0; if (on && !m.dizzy) { m.dizzy = emojiSprite('💫', 1.1); m.dizzy.position.y = 2.9; m.g.add(m.dizzy); } if (m.dizzy) m.dizzy.visible = on; }
+  applyConceal(S);
 }
 function fxTick(t) {
   for (const a of fxAnim) {
@@ -1685,9 +1851,116 @@ async function swapEvent(e) {
 }
 async function slipEvent(e) {
   const m = pm[e.pid], x = m.g.position.x, z = m.g.position.z; m.busy = true;
-  popEmoji(e.kind === 'oil' ? '🛢️' : '🍌', x, z, 2.2);
+  popEmoji(e.kind === 'oil' ? '🛢️' : e.kind === 'trap' ? '🪤' : e.kind === 'sprain' ? '🤕' : '🍌', x, z, 2.2); if (e.kind === 'trap' && typeof SND !== 'undefined') SND.sfx('trap');
   await tween(.95, (u) => { m.inner.rotation.z = Math.sin(u * Math.PI * 5) * (1 - u) * 1.0; m.g.position.y = .12 + Math.abs(Math.sin(u * Math.PI * 2)) * .55 * (1 - u); });
   m.inner.rotation.z = 0; m.g.position.y = .12; m.busy = false;
+}
+
+/* ---------- 技能特效 ---------- */
+const SK_COL = { gkwall: 0x48b8ff, stepover: 0xffa63a, stealth: 0x8a6bff, clone: 0x3ae0d0, purify: 0xb35cff, thunder: 0xffe14a, recall: 0x6aff7a };
+const SK_EM = { gkwall: '🛡️', stepover: '🦶', stealth: '🥷', clone: '👥', purify: '🔮', thunder: '⚡', recall: '🏃' };
+function ringBurst(x, z, col, r0, r1, dur, y) {
+  const ring = new THREE.Mesh(new THREE.RingGeometry(.55, .8, 36), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: .95, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false }));
+  ring.rotation.x = -Math.PI / 2; ring.position.set(x, y || .22, z); ring.renderOrder = 4; scene.add(ring);
+  return tween(dur, (u) => { ring.scale.setScalar(r0 + (r1 - r0) * u); ring.material.opacity = .95 * (1 - u); }, easeOut).then(() => { scene.remove(ring); ring.geometry.dispose(); ring.material.dispose(); });
+}
+function lightSeg(a, b, r, col) {
+  const d = new THREE.Vector3().subVectors(b, a), len = d.length(), m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, len, 5), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 1, blending: THREE.AdditiveBlending, depthWrite: false }));
+  m.position.copy(a).add(b).multiplyScalar(.5); m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize()); m.renderOrder = 6; return m;
+}
+function boltMeshes(from, to, jit, r, col) {
+  const pts = [from.clone()], n = 9; for (let i = 1; i < n; i++) { const u = i / n; pts.push(new THREE.Vector3(lerp(from.x, to.x, u) + (Math.random() - .5) * jit, lerp(from.y, to.y, u) + (Math.random() - .5) * jit * .4, lerp(from.z, to.z, u) + (Math.random() - .5) * jit)); } pts.push(to.clone());
+  const g = new THREE.Group(); for (let i = 1; i < pts.length; i++) g.add(lightSeg(pts[i - 1], pts[i], r, col)); scene.add(g); return g;
+}
+function dropGroup(g) { scene.remove(g); g.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); }); }
+function zapArcs(A, B) {
+  const gs = []; for (let k = 0; k < 4; k++) gs.push(boltMeshes(A, B, 1.6, .07, 0xfff06a));
+  tween(.55, (u) => { gs.forEach((g, i) => { g.visible = ((u * 16 + i) % 2) < 1.3; g.traverse(o => { if (o.material) o.material.opacity = 1 - u; }); }); }, t => t).then(() => gs.forEach(dropGroup));
+}
+async function skillGetEvent(e) {
+  if (viewer >= 0 && viewer !== e.team) return; const m = pm[e.pid], x = m.g.position.x, z = m.g.position.z;
+  if (typeof SND !== 'undefined') SND.sfx('getskill'); popEmoji(SK_EM[e.k] || '✨', x, z, 2); ringBurst(x, z, SK_COL[e.k] || 0xffffff, .8, 2.2, .7); await sleep(500);
+}
+async function skillEvent(e, S) {
+  const m = pm[e.pid], x = m.g.position.x, z = m.g.position.z, col = SK_COL[e.k] || 0xffffff;
+  if (typeof SND !== 'undefined' && e.k !== 'thunder') SND.sfx('skill');
+  popEmoji(SK_EM[e.k] || '✨', x, z, 2.6); ringBurst(x, z, col, .8, 3.2, .7); sleep(160).then(() => ringBurst(x, z, col, .6, 2.4, .6));
+  const pil = new THREE.Mesh(new THREE.CylinderGeometry(.7, .9, 7, 16, 1, true), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: .0, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false }));
+  pil.position.set(x, 3.5, z); scene.add(pil);
+  if (e.k === 'stealth') { tween(.6, (u) => { m.inner.scale.setScalar(.92 * (1 - .6 * Math.sin(u * Math.PI))); }, t => t).then(() => m.inner.scale.setScalar(.92)); }
+  await tween(.7, (u) => { pil.material.opacity = Math.sin(u * Math.PI) * .45; pil.scale.set(1 + u * .4, 1, 1 + u * .4); }, t => t);
+  scene.remove(pil); pil.geometry.dispose(); pil.material.dispose(); crowdBoost(1.4);
+}
+async function leapEvent(e, S) {
+  const m = pm[e.pid], pts = e.path.map(cellXZ), n = pts.length; m.busy = true; m.g.visible = true; m.inner.position.y = 0;
+  m.g.position.set(pts[0].x, .12, pts[0].z);
+  for (let i = 1; i <= n - 3; i++) await hop(m, pts[i - 1], pts[i], .17, .7, i % 6);
+  const a = pts[Math.max(0, n - 3)], b = pts[n - 1], v = pts[n - 2];
+  if (typeof SND !== 'undefined') SND.sfx('leap');
+  m.busy = true; crowdBoost(2.2);
+  await tween(.62, (u) => { m.g.position.set(lerp(a.x, b.x, u), .12 + Math.sin(u * Math.PI) * 3.4, lerp(a.z, b.z, u)); m.inner.rotation.y = (m.team === 0 ? Math.PI / 2 : -Math.PI / 2) + u * Math.PI * 2; }, t => t);
+  m.inner.rotation.y = m.team === 0 ? Math.PI / 2 : -Math.PI / 2; m.g.position.set(b.x, .12, b.z); m.cell = e.path[n - 1];
+  ringBurst(b.x, b.z, 0xffa63a, .6, 2, .5); popEmoji('💫', v.x, v.z, 2.2); m.busy = false;
+  if (typeof SND !== 'undefined') SND.sfx('land');
+}
+async function cloneEvent(e, S) {
+  if (typeof SND !== 'undefined') SND.sfx('clone');
+  const mm = pm[e.master]; if (mm) { ringBurst(mm.g.position.x, mm.g.position.z, 0x3ae0d0, .8, 3, .7); }
+  await Promise.all(e.pids.map(async (pid, i) => {
+    const m = pm[pid], p = cellXZ(e.cells[i]); m.busy = true; m.cell = e.cells[i]; m.g.position.set(p.x, .12, p.z); m.g.visible = true; m.g.scale.setScalar(.01);
+    ringBurst(p.x, p.z, 0x3ae0d0, .5, 2.4, .8); popEmoji('👥', p.x, p.z, 1.6);
+    await tween(.6, (u) => { m.g.scale.setScalar(Math.max(.01, u < .7 ? u / .7 * 1.2 : 1.2 - (u - .7) / .3 * .2)); m.inner.rotation.y += .35; }, t => t);
+    m.inner.rotation.y = m.team === 0 ? Math.PI / 2 : -Math.PI / 2; m.g.scale.setScalar(1); m.busy = false;
+  }));
+}
+async function purifyEvent(e, S) {
+  const mm = pm[e.pid], x = mm.g.position.x, z = mm.g.position.z, P = S.pieces[e.pid], dir = P.team === 0 ? 1 : -1;
+  if (typeof SND !== 'undefined') SND.sfx('purify');
+  // 施法魔法陣
+  const cv = canvasTex(256, 256, (g) => { g.strokeStyle = '#e6c8ff'; g.lineWidth = 8; g.beginPath(); g.arc(128, 128, 118, 0, 7); g.stroke(); g.lineWidth = 5; g.beginPath(); g.arc(128, 128, 88, 0, 7); g.stroke(); for (let i = 0; i < 6; i++) { const a = i * Math.PI / 3; g.beginPath(); g.moveTo(128 + Math.cos(a) * 88, 128 + Math.sin(a) * 88); g.lineTo(128 + Math.cos(a + 2.094) * 88, 128 + Math.sin(a + 2.094) * 88); g.stroke(); } });
+  const circle = new THREE.Mesh(new THREE.PlaneGeometry(4, 4), new THREE.MeshBasicMaterial({ map: cv, transparent: true, opacity: 0, color: 0xb35cff, blending: THREE.AdditiveBlending, depthWrite: false })); circle.rotation.x = -Math.PI / 2; circle.position.set(x, .25, z); circle.renderOrder = 4; scene.add(circle);
+  popEmoji('🔮', x, z, 2.6);
+  mm.busy = true; const orb = new THREE.Mesh(new THREE.SphereGeometry(.35, 12, 10), new THREE.MeshBasicMaterial({ color: 0xd9a8ff, transparent: true, opacity: .9, blending: THREE.AdditiveBlending, depthWrite: false })); orb.position.set(x + dir * .6, 1.9, z); scene.add(orb);
+  await tween(.7, (u) => { circle.material.opacity = Math.min(1, u * 2) * .9; circle.rotation.z = u * 5; circle.scale.setScalar(.6 + u * .9); orb.scale.setScalar(1 + u * 1.8); orb.position.y = 1.9 + Math.sin(u * 12) * .12; mm.inner.rotation.z = -dir * Math.sin(u * Math.PI) * .25; }, t => t);
+  // 扇形五格紫色衝擊
+  const hexG = new THREE.CylinderGeometry(.93, .93, .09, 6); hexG.rotateY(Math.PI / 6); const fl = [];
+  for (const c of e.cells) { const C = cells[c], h = new THREE.Mesh(hexG, new THREE.MeshBasicMaterial({ color: 0xb35cff, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false })); h.position.set(C.x, .2, C.z); h.renderOrder = 4; scene.add(h); fl.push({ h, d: Math.hypot(C.x - x, C.z - z) }); }
+  const sph = []; for (const f of fl) { const sp = emojiSprite('✨', 1.2); sp.position.set(f.h.position.x, 1, f.h.position.z); scene.add(sp); sph.push(sp); }
+  await tween(.9, (u) => { fl.forEach((f, i) => { const k = Math.max(0, Math.min(1, u * 2 - f.d * .12)); f.h.material.opacity = Math.sin(k * Math.PI) * .85; sph[i].position.y = 1 + k * 1.4; sph[i].material.opacity = Math.sin(k * Math.PI); }); orb.scale.setScalar(2.8 * (1 - u)); circle.material.opacity = .9 * (1 - u * .6); }, t => t);
+  scene.remove(orb); orb.geometry.dispose(); orb.material.dispose();
+  // 命中者：解除技能並擊退
+  await Promise.all(e.hits.map(async (h) => {
+    const m = pm[h.pid], fa = cellXZ(h.from);
+    m.busy = true; m.g.visible = true; m.g.position.set(fa.x, .12, fa.z); popEmoji('💥', fa.x, fa.z, 2.2); ringBurst(fa.x, fa.z, 0xb35cff, .6, 2.4, .6);
+    if (h.kind === 'clone') { await tween(.5, (u) => { m.g.scale.setScalar(1 - u); m.g.position.y = .12 + u * 2; m.inner.rotation.y += .5; }, t => t); m.g.visible = false; m.g.scale.setScalar(1); m.g.position.y = .12; m.cell = -1; m.busy = false; return; }
+    if (h.kind === 'gk') { await tween(.5, (u) => { m.inner.rotation.z = Math.sin(u * 20) * .25 * (1 - u); }, t => t); m.inner.rotation.z = 0; m.busy = false; return; }
+    const tb = cellXZ(h.to); await tween(.55, (u) => { m.g.position.set(lerp(fa.x, tb.x, u), .12 + Math.sin(u * Math.PI) * 2.2, lerp(fa.z, tb.z, u)); m.inner.rotation.z = Math.sin(u * Math.PI * 3) * .5 * (1 - u); }, t => t);
+    m.inner.rotation.z = 0; m.g.position.set(tb.x, .12, tb.z); m.cell = h.to; m.busy = false;
+  }));
+  await tween(.45, (u) => { circle.material.opacity = .54 * (1 - u); fl.forEach((f, i) => { f.h.material.opacity = 0; sph[i].material.opacity = 0; }); }, t => t);
+  scene.remove(circle); circle.geometry.dispose(); circle.material.dispose(); fl.forEach(f => { scene.remove(f.h); f.h.material.dispose(); }); sph.forEach(sp => { scene.remove(sp); sp.material.dispose(); }); hexG.dispose();
+  mm.inner.rotation.z = 0; mm.busy = false; crowdBoost(1.8);
+}
+async function thunderShot(e, S) {
+  const lights = []; scene.traverse(o => { if (o.isLight) lights.push([o, o.intensity]); });
+  const dome = new THREE.Mesh(new THREE.SphereGeometry(430, 24, 16), new THREE.MeshBasicMaterial({ color: 0x04050c, side: THREE.BackSide, transparent: true, opacity: 0, depthWrite: false, fog: false })); dome.renderOrder = -1; scene.add(dome);
+  const H = pm[e.from], hx = H.g.position.x, hz = H.g.position.z, tg = cellXZ(e.cell), set = (k) => lights.forEach(([l, i]) => { l.intensity = i * k; });
+  if (typeof SND !== 'undefined') SND.sfx('thunder');
+  popEmoji('⚡', hx, hz, 3); ringBurst(hx, hz, 0xffe14a, .8, 3.5, .6);
+  await tween(.55, (u) => { dome.material.opacity = .9 * u; set(1 - .82 * u); }, t => t);
+  // 雷電交加
+  for (let k = 0; k < 4; k++) {
+    const bx = lerp(hx, tg.x, Math.random()) + (Math.random() - .5) * 14, bz = (Math.random() - .5) * 22, g = boltMeshes(new THREE.Vector3(bx + (Math.random() - .5) * 6, 60, bz), new THREE.Vector3(bx, 0, bz), 7, .22, 0xffee66);
+    set(2.4); await sleep(70); set(.18); await sleep(60); set(1.8); await sleep(50); set(.18); dropGroup(g); await sleep(110);
+  }
+  // 雷霆一擊：球瞬間射出
+  const g1 = boltMeshes(new THREE.Vector3(hx, 50, hz), new THREE.Vector3(hx, 1, hz), 4, .3, 0xffee66); set(2.6);
+  const fly = ballFlight({ from: e.from, cell: e.cell, thunder: true }, S, false);
+  await sleep(90); dropGroup(g1); set(.2); await fly;
+  const g2 = boltMeshes(new THREE.Vector3(tg.x, 55, tg.z), new THREE.Vector3(tg.x, 1, tg.z), 5, .35, 0xffee66); set(2.8); crowdBoost(3);
+  await sleep(160); dropGroup(g2);
+  await tween(.7, (u) => { dome.material.opacity = .9 * (1 - u); set(.2 + .8 * u); }, t => t);
+  set(1); scene.remove(dome); dome.geometry.dispose(); dome.material.dispose();
 }
 
 /* ---------- 足球 ---------- */
@@ -1709,8 +1982,8 @@ function ballTick(t) {
   if (!ballMesh) return; const dt = Math.min(.1, t - ballLastT); ballLastT = t;
   if (ballFly || ballFree) return;
   if (ballHolder < 0) { ballMesh.visible = false; ballShadow.visible = false; return; }
-  const m = pm[ballHolder]; if (!m || !m.g.visible) { return; }
-  const dir = ballHolder < 11 ? 1 : -1, ph = t * 5.5 + ballHolder;
+  const m = pm[ballHolder]; if (!m || !m.g.visible) { ballMesh.visible = false; ballShadow.visible = false; return; }
+  const dir = m.team === 0 ? 1 : -1, ph = t * 5.5 + ballHolder;
   // 腳下盤球：在腳前一小段距離彈跳、來回滾動
   const bx = m.g.position.x + dir * (.78 + .12 * Math.sin(ph)), bz = m.g.position.z + .22 * Math.sin(ph * .5), by = m.g.position.y + .34 + Math.abs(Math.sin(ph)) * .26;
   ballMesh.visible = true; ballMesh.position.set(bx, by, bz); ballMesh.rotation.z -= dir * dt * 9; ballMesh.rotation.x += dt * 3;
@@ -1718,22 +1991,23 @@ function ballTick(t) {
 }
 const trailPool = [];
 async function ballFlight(e, S, high) {
-  if (!ballMesh) return; const shot = e.cell !== undefined, dir = shot ? (e.from < 11 ? 1 : -1) : (e.to < 11 ? 1 : -1);
+  if (!ballMesh) return; const shot = e.cell !== undefined, th = !!e.thunder, dir = shot ? (pm[e.from].team === 0 ? 1 : -1) : (pm[e.to].team === 0 ? 1 : -1);
   const toP = shot ? null : S.pieces[e.to];
   const tc = shot ? cellXZ(e.cell) : (toP.cell >= 0 ? cellXZ(toP.cell) : { x: ballMesh.position.x, z: ballMesh.position.z });
   const A = ballMesh.position.clone(), B = shot ? new THREE.Vector3(tc.x + dir * 1.5, .9, tc.z) : new THREE.Vector3(tc.x + dir * .78, .38, tc.z);
-  const dist = Math.hypot(B.x - A.x, B.z - A.z), dur = shot ? Math.min(1.1, Math.max(.45, dist / 30 + .25)) : Math.min(1.6, Math.max(.55, dist / 20 + .35)), H = shot ? Math.min(2.2, 1 + dist * .05) : Math.max(2.2, Math.min(high ? 11 : 8.5, dist * (high ? .42 : .3)));
+  const dist = Math.hypot(B.x - A.x, B.z - A.z), dur = th ? .26 : shot ? Math.min(1.1, Math.max(.45, dist / 30 + .25)) : Math.min(1.6, Math.max(.55, dist / 20 + .35)), H = shot ? Math.min(2.2, 1 + dist * .05) : Math.max(2.2, Math.min(high ? 11 : 8.5, dist * (high ? .42 : .3)));
   ballFly = true; ballMesh.visible = true; ballShadow.visible = true;
   // 傳球軌跡：地面光線 + 殘影
   const ang = Math.atan2(B.z - A.z, B.x - A.x);
-  const line = new THREE.Mesh(new THREE.PlaneGeometry(1, .34), new THREE.MeshBasicMaterial({ color: 0xfff2a8, transparent: true, opacity: .75, blending: THREE.AdditiveBlending, depthWrite: false }));
+  const line = new THREE.Mesh(new THREE.PlaneGeometry(1, th ? 1.1 : .34), new THREE.MeshBasicMaterial({ color: th ? 0xffd21a : 0xfff2a8, transparent: true, opacity: .75, blending: THREE.AdditiveBlending, depthWrite: false }));
   line.rotation.x = -Math.PI / 2; line.rotation.z = ang; line.position.set(A.x, .19, A.z); line.renderOrder = 4; scene.add(line);
-  const trail = []; for (let i = 0; i < 12; i++) { const sp = new THREE.Mesh(new THREE.SphereGeometry(.28 * (1 - i / 16), 8, 6), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: .5 * (1 - i / 12), blending: THREE.AdditiveBlending, depthWrite: false })); sp.visible = false; scene.add(sp); trail.push(sp); }
+  const trail = []; for (let i = 0; i < 12; i++) { const sp = new THREE.Mesh(new THREE.SphereGeometry((th ? .6 : .28) * (1 - i / 16), 8, 6), new THREE.MeshBasicMaterial({ color: th ? 0xffe14a : 0xffffff, transparent: true, opacity: .5 * (1 - i / 12), blending: THREE.AdditiveBlending, depthWrite: false })); sp.visible = false; scene.add(sp); trail.push(sp); }
   const hist = [];
   // 傳球者踢球動作
   const from = pm[e.from !== undefined ? e.from : ballHolder];
   if (from && from.g.visible) tween(.3, (u) => { from.inner.rotation.z = -dir * Math.sin(u * Math.PI) * .45; }, t => t).then(() => { from.inner.rotation.z = 0; });
-  await sleep(120);
+  await sleep(th ? 40 : 120);
+  if (th && typeof SND !== 'undefined') SND.sfx('zap');
   await tween(dur, (u) => {
     const x = lerp(A.x, B.x, u), z = lerp(A.z, B.z, u), y = lerp(A.y, B.y, u) + Math.sin(u * Math.PI) * H;
     ballMesh.position.set(x, y, z); ballMesh.rotation.x += .5; ballMesh.rotation.z -= dir * .6;
@@ -1742,6 +2016,7 @@ async function ballFlight(e, S, high) {
     trail.forEach((sp, i) => { const h = hist[(i + 1) * 2]; if (h) { sp.visible = true; sp.position.set(h.x, h.y, h.z); } });
     const len = Math.max(.01, Math.hypot(x - A.x, z - A.z)); line.scale.x = len; line.position.set((A.x + x) / 2, .19, (A.z + z) / 2); line.material.opacity = .75 * (1 - u * .3);
   }, t => t);
+  if (th) { zapArcs(A, B); }
   ballMesh.position.copy(B); if (shot) { ballFree = true; } else { ballHolder = e.to; ballFree = false; } ballFly = false;
   // 落點特效：擴散光環 + 小彈跳
   const ring = new THREE.Mesh(new THREE.RingGeometry(.4, .62, 28), new THREE.MeshBasicMaterial({ color: 0xffffaa, transparent: true, opacity: .9, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false }));
@@ -1788,7 +2063,8 @@ function makePiece(P) {
   const inner = new THREE.Group(); while (g.children.length) { const c = g.children[0]; if (c === ring) break; inner.add(c); }
   const wrap = new THREE.Group(); wrap.add(inner); wrap.add(ring); inner.rotation.y = t === 0 ? Math.PI / 2 : -Math.PI / 2; inner.scale.setScalar(.92);
   wrap.userData.pid = P.id; inner.traverse(o => { o.userData.pid = P.id; });
-  return { g: wrap, inner, ring, pid: P.id, busy: false, cell: -1 };
+  if (P.clone) { const mk = emojiSprite('👥', .85); mk.position.y = 2.75; wrap.add(mk); const cr = new THREE.Mesh(new THREE.RingGeometry(.62, .78, 28), new THREE.MeshBasicMaterial({ color: 0x3ae0d0, transparent: true, opacity: .85, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending })); cr.rotation.x = -Math.PI / 2; cr.position.y = .16; wrap.add(cr); inner.scale.setScalar(.84); }
+  return { g: wrap, inner, ring, pid: P.id, team: t, clone: !!P.clone, busy: false, cell: -1 };
 }
 function cellXZ(i) { return { x: cells[i].x, z: cells[i].z }; }
 function placeMesh(pm_, cell) { if (cell < 0) { pm_.g.visible = false; pm_.cell = -1; return; } const p = cellXZ(cell); pm_.g.position.set(p.x, .12, p.z); pm_.g.visible = true; pm_.g.scale.setScalar(1); pm_.cell = cell; }
@@ -2026,7 +2302,7 @@ function init(cv) {
   scene = new THREE.Scene(); scene.background = new THREE.Color(0x9ccdfa); scene.fog = new THREE.Fog(0xcfe6ff, 170, 470);
   camera = new THREE.PerspectiveCamera(42, 1, .5, 900);
   buildWorld(); buildQA(); makeBallMesh(); buildDecks(); dice.att = makeDie('att'); dice.def = makeDie('def'); dice.ball = makeDie('ball'); coin = makeCoin();
-  for (let i = 0; i < 22; i++) { const p = makePiece({ id: i, team: i < 11 ? 0 : 1, gk: i % 11 === 0 }); pm.push(p); scene.add(p.g); p.g.visible = false; }
+  for (let i = 0; i < 30; i++) { const cl = i >= 22; const p = makePiece({ id: i, team: cl ? (i < 26 ? 0 : 1) : (i < 11 ? 0 : 1), gk: !cl && i % 11 === 0, clone: cl }); pm.push(p); scene.add(p.g); p.g.visible = false; }
   initControls(); window.addEventListener('resize', resize); resize();
   cam.user = false; preset('tactic', true);
   let last = performance.now();
@@ -2056,7 +2332,7 @@ function setGoalGlow(team) { goalGlow[0].visible = team === 0; goalGlow[1].visib
 function sync(S) {
   if (S.qa) setQA(S.qa, false);
   for (const P of S.pieces) { const m = pm[P.id]; if (m.busy) continue; placeMesh(m, P.cell); if (P.cell >= 0) m.inner.position.y = 0; }
-  syncFx(S, false);
+  syncFx(S, false); applyConceal(S);
   if (!ballFly) { ballHolder = S.ball === undefined ? -1 : S.ball; ballFree = false; }
 }
 function resetAll() { ballHolder = -1; ballFly = false; if (ballMesh) { ballMesh.visible = false; ballShadow.visible = false; } fxSig = ''; if (fxRoot) { scene.remove(fxRoot); fxRoot = null; fxAnim = []; } for (const m of pm) { m.busy = false; m.g.visible = false; m.cell = -1; if (m.dizzy) m.dizzy.visible = false; } dice.att.visible = false; dice.def.visible = false; dice.ball.visible = false; if (coin) coin.visible = false; setHighlights([]); setPick(new Set(), -1); setGoalGlow(-1); }
@@ -2075,7 +2351,7 @@ async function playEvent(e, S) {
     case 'move': {
       const m = pm[e.pid]; m.busy = true; m.inner.position.y = 0; m.g.visible = true;
       const pts = e.path.map(cellXZ); if (e.goal) pts.push(goalPos[S.pieces[e.pid].team]);
-      m.g.position.set(pts[0].x, .12, pts[0].z);
+      m.g.position.set(pts[0].x, .12, pts[0].z); if (concealed(S, e.pid)) m.g.visible = false;
       for (let i = 1; i < pts.length; i++) await hop(m, pts[i - 1], pts[i], .17, .7, i % 6);
       if (typeof SND !== 'undefined') SND.sfx('land');
       if (e.goal) { crowdBoost(3); const gp = goalPos[S.pieces[e.pid].team]; burst(S.pieces[e.pid].team, gp.x, gp.z); await tween(.35, (u) => m.g.scale.setScalar(1 - u)); m.g.visible = false; m.g.scale.setScalar(1); m.cell = -1; }
@@ -2094,18 +2370,23 @@ async function playEvent(e, S) {
     case 'qa': setQA(e.cells, true); break;
     case 'card': await flyCard(E.CARDS[e.id]); break;
     case 'goal': break;
-    case 'shoot': await ballFlight({ from: e.from, cell: e.cell }, S, false); break;
+    case 'shoot': if (e.thunder) await thunderShot(e, S); else await ballFlight({ from: e.from, cell: e.cell }, S, false); break;
+    case 'skillget': await skillGetEvent(e); break;
+    case 'skill': await skillEvent(e, S); break;
+    case 'leap': await leapEvent(e, S); break;
+    case 'clone': await cloneEvent(e, S); break;
+    case 'purify': await purifyEvent(e, S); break;
     case 'pass': await ballFlight({ from: e.from, to: e.to }, S, false); if (e.fail) { popEmoji('💢', ballMesh.position.x, ballMesh.position.z, 2); } break;
     case 'ball': await ballEvent(e, S); break;
     case 'fx': syncFx(S, true); break;
     case 'fxend': syncFx(S, false); break;
-    case 'peel': if (e.team === peelView) { const q = cellXZ(e.cell); popEmoji('🍌', q.x, q.z, 1.8); } syncFx(S, true); break;
+    case 'peel': if (e.team === peelView) { const q = cellXZ(e.cell); popEmoji(e.kind === 'trap' ? '🪤' : '🍌', q.x, q.z, 1.8); } syncFx(S, true); break;
     case 'slip': await slipEvent(e); break;
     case 'swap': await swapEvent(e); break;
     case 'bull': await bullEvent(e); break;
   }
 }
-return { setPeelView: t => { peelView = t; fxSig = ''; }, init, sync, setQA, playEvent, setHighlights, setPick, setGoalGlow, preset, zoom, resetAll, setMyTeam, burst, sleep, tween, setOnTap: f => { onTap = f; }, cam, pm, get camera() { return camera; }, resizeNow: resize };
+return { setPeelView: t => { peelView = t; fxSig = ''; }, setViewer: t => { if (viewer !== t) { viewer = t; fxSig = ''; } }, setSkillMarks: (arr) => { const n = new Set(arr); if (n.size === skillSet.size && [...n].every(x => skillSet.has(x))) return; skillSet = n; fxSig = ''; }, init, sync, setQA, playEvent, setHighlights, setPick, setGoalGlow, preset, zoom, resetAll, setMyTeam, burst, sleep, tween, setOnTap: f => { onTap = f; }, cam, pm, get camera() { return camera; }, resizeNow: resize };
 }
 
 /* ===== 遊戲流程 / 介面 / 連線 ===== */
@@ -2123,7 +2404,8 @@ window.addEventListener('unhandledrejection', (e) => { const b = $('errBox') || 
 function log(text) { const l = $('log'), d = document.createElement('div'); d.textContent = text; l.appendChild(d); while (l.children.length > 6) l.removeChild(l.firstChild); setTimeout(() => d.remove(), 9000); }
 function banner(text) { const b = $('banner'); b.textContent = text; b.classList.remove('show'); void b.offsetWidth; b.classList.add('show'); }
 const tag = t => `<span class="tag ${t === 0 ? 'r' : 'y'}">${TN[t]}</span>`;
-const pname = pid => (pid % 11 === 0 ? '門將' : '#' + (pid % 11 + 1) + ' 球員');
+const pname = pid => (pid >= 22 ? '分身' : pid % 11 === 0 ? '門將' : '#' + (pid % 11 + 1) + ' 球員');
+const SK_KIND = { gkwall: 'gkpow' };
 function loadScript(src) { return new Promise((res, rej) => { const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = () => rej(new Error('載入失敗 ' + src)); document.head.appendChild(s); }); }
 function show(id, on) {
   const el = $(id); if (!el) return;
@@ -2166,7 +2448,7 @@ function startGame(mode, o) {
   const g = gen;
   wipe(() => {
     if (g !== gen) return;
-    V.resetAll(); V.setMyTeam(cfg.mode === 'online' ? cfg.myTeam : 0); V.setPeelView(cfg.mode === 'online' ? cfg.myTeam : 0); V.cam.user = false; V.preset('tactic', true);
+    V.resetAll(); V.setMyTeam(cfg.mode === 'online' ? cfg.myTeam : 0); V.setPeelView(cfg.mode === 'online' ? cfg.myTeam : 0); V.setViewer(cfg.mode === 'online' ? cfg.myTeam : cfg.mode === 'ai' ? 0 : -1); V.cam.user = false; V.preset('tactic', true);
     ['menu', 'modeMenu', 'netMenu', 'rulesOv', 'overOv', 'setOv'].forEach(i => show(i, false));
     show('topbar', true); show('panel', true); show('netBadge', cfg.mode === 'online');
     $('log').innerHTML = ''; SND.music('match'); SND.sfx('whistle', 0, .2);
@@ -2265,8 +2547,20 @@ function setBtns(list) {
   const box = $('actions'); box.innerHTML = '';
   for (const b of list) { const el = document.createElement('button'); el.className = 'btn ' + (b.cls || ''); el.innerHTML = b.html; el.disabled = !!b.dis; el.onclick = b.fn; box.appendChild(el); }
 }
+function skillViewTeam() { return cfg.mode === 'online' ? cfg.myTeam : cfg.mode === 'ai' ? 0 : (S ? S.turn : 0); }
+function skillHolders(team, any) { return S.pieces.filter(p => p.team === team && S.skills[p.id] && p.cell >= 0 && (any || E.skillCheck(S, p.id).ok)).map(p => p.id); }
+let skillPid = -1;
+function openSkill(pid) {
+  const k = S.skills[pid], ck = E.skillCheck(S, pid);
+  if (!ck.ok) { SND.sfx('error'); log(ck.why); return; }
+  skillPid = pid; SND.sfx('select');
+  $('skT').textContent = E.SKILL_NAMES[k] + '　' + pname(pid);
+  $('skD').textContent = E.KINDS[SK_KIND[k] || k].text + (k === 'stealth' && cfg.mode === 'local' ? '' : '');
+  show('skillOv', true);
+}
 function renderUI() {
   if (!S) return;
+  { const vt = skillViewTeam(); V.setSkillMarks(S.phase === 'play' ? skillHolders(vt, true) : []); }
   $('s0').textContent = S.score[0]; $('s1').textContent = S.score[1]; $('goalsTo').textContent = '先得 ' + S.goals + ' 分';
   const chip = $('turnChip');
   if (S.phase === 'play') { chip.textContent = TN[S.turn] + '回合'; chip.className = 'c' + S.turn; } else { chip.textContent = S.phase === 'over' ? '比賽結束' : S.phase === 'setup' ? '擺棋' : '擲骰'; chip.className = ''; }
@@ -2292,7 +2586,8 @@ function renderUI() {
           tg('def', '防守骰 1·2·3<small>短程；全場可搶斷</small>', 'def'),
           tg('ball', '⚽ 足球骰 4–13<small>傳球／射門距離；球不在己方則作廢</small>', 'ball'),
           { html: '🎲 擲骰', cls: 'pri', dis: diceSel.length !== 2, fn: () => { const d = diceSel.slice(); diceSel = []; doAct({ t: 'roll', dice: d }); } }];
-        if (S.gkp[cur.team] && S.pieces[cur.team * 11].cell >= 0) btns.unshift({ html: '🛡️ 發動門將威能<small>門將腳下與左右 3 格靈壓牆 1 回合（不耗回合）</small>', cls: 'pri', fn: () => doAct({ t: 'gkskill' }) });
+        const held = skillHolders(cur.team);
+        if (held.length) { pr += `<br><b>✨ 點擊發光的球員</b>可發動技能（${held.map(id => E.SKILL_NAMES[S.skills[id]] + ' ' + pname(id)).join('、')}）`; for (const id of held) pick.add(id); }
         break;
       }
       case 'order': {
@@ -2351,7 +2646,7 @@ function renderUI() {
         break;
       }
       case 'fj': {
-        if (fjSel < 0) { pr = `${tag(c)} 快攻啟動：先點選要跳走的<b>己方棋子</b>`; for (const p of S.pieces) if (p.team === cur.team && p.cell >= 0) pick.add(p.id); }
+        if (fjSel < 0) { pr = `${tag(c)} 快攻啟動：先點選要跳走的<b>己方棋子</b>`; for (const p of S.pieces) if (p.team === cur.team && p.cell >= 0 && !p.clone) pick.add(p.id); }
         else { pr = `${tag(c)} 快攻啟動：點選<b>空的快攻點</b>`; selP = fjSel; hl.push({ cell: S.pieces[fjSel].cell, kind: 'sel' }); for (const q of S.qa) if (occA[q] === -1) hl.push({ cell: q, kind: 'qa' }); btns = [{ html: '重選棋子', cls: 'ghost', fn: () => { fjSel = -1; renderUI(); } }]; }
         break;
       }
@@ -2367,17 +2662,28 @@ function renderUI() {
         break;
       }
       case 'peel': {
-        pr = `${tag(c)} 🍌 暗放香蕉皮（還要放 <b>${cur.n}</b> 個）：點選己方半場的<b>空格</b>，只有你看得到`;
-        for (const id of E.peelCells(S, cur.team)) hl.push({ cell: id, kind: 'move' });
+        const tp = cur.kind === 'trap';
+        pr = tp ? `${tag(c)} 🪤 暗放捕鼠夾（還要放 <b>${cur.n}</b> 個）：點選<b>對方半場</b>的空格，只有你看得到` : `${tag(c)} 🍌 暗放香蕉皮（還要放 <b>${cur.n}</b> 個）：點選己方半場的<b>空格</b>，只有你看得到`;
+        for (const id of E.peelCells(S, cur.team, cur.kind)) hl.push({ cell: id, kind: 'move' });
         break;
       }
       case 'swap': {
-        for (const p of S.pieces) if (!p.gk && p.cell >= 0) pick.add(p.id);
+        for (const p of S.pieces) if (!p.gk && !p.clone && p.cell >= 0 && (p.team === cur.team || !E.isHidden(S, p.id))) pick.add(p.id);
         for (const id of swapSel) hl.push({ cell: S.pieces[id].cell, kind: 'sel' });
         selP = swapSel.length ? swapSel[0] : -1;
         pr = `${tag(c)} 🚪 任意門：點選<b>兩名球員</b>互換位置（不分敵我，門將除外）　已選 ${swapSel.length}/2`;
         if (swapSel.length === 2) btns = [{ html: '✔ 確認互換', cls: 'pri', fn: () => doAct({ t: 'swap', a: swapSel[0], b: swapSel[1] }) }, { html: '重選', cls: 'ghost', fn: () => { swapSel = []; renderUI(); } }];
         else if (swapSel.length === 1) btns = [{ html: '重選', cls: 'ghost', fn: () => { swapSel = []; renderUI(); } }];
+        break;
+      }
+      case 'skillpick': {
+        pr = `${tag(c)} ✨ 【${E.SKILL_NAMES[cur.s]}】：點選<b>一名己方球員</b>持有此技能（之後點擊他再發動）`;
+        for (const p of S.pieces) if (p.team === cur.team && p.cell >= 0 && !p.clone && !S.skills[p.id]) pick.add(p.id);
+        break;
+      }
+      case 'recall': {
+        pr = `${tag(c)} 🏃‍♂️ 回防機制：點選<b>球門前 3 格</b>中的空格，${pname(cur.pid)} 瞬間移動過去`;
+        for (const id of E.recallCells(S, cur.team)) hl.push({ cell: id, kind: 'qa' });
         break;
       }
       case 'gk': {
@@ -2396,13 +2702,16 @@ function renderUI() {
 function renderFxHud() {
   const el = $('fxHud'); if (!el) return; const L = [];
   if (S.ball >= 0) { const bp = S.pieces[S.ball]; L.push(`⚽ 持球：${TN[bp.team]} ${pname(bp.id)}`); }
-  const NM = { flood: '💦 淹水區', nosteal: '🕊️ 和平令', oil: '🛢️ 沙拉油區', barrier: '🛡️ 靈壓牆', noqa: '🚫 結界失效' };
-  for (const f of S.fx || []) L.push(`${NM[f.k]}${(f.k === 'barrier' || f.k === 'noqa') ? '（' + TN[f.team] + '）' : ''} 剩 ${Math.ceil(f.left / 2)} 回合`);
-  for (const t of [0, 1]) if (S.gkp && S.gkp[t]) L.push(`🛡️ ${TN[t]} 持有門將威能`);
+  const NM = { flood: '💦 淹水區', nosteal: '🕊️ 和平令', oil: '🛢️ 沙拉油區', barrier: '🛡️ 靈壓牆', noqa: '🚫 結界失效', stealth: '🥷 隱身中' };
+  const vt0 = skillViewTeam();
+  for (const f of (S.fx || [])) { if (f.k === 'stealth' && cfg.mode !== 'local' && f.team !== vt0) continue; L.push(`${NM[f.k]}${(f.k === 'barrier' || f.k === 'noqa' || f.k === 'stealth') ? '（' + (f.k === 'stealth' ? pname(f.pid) : TN[f.team]) + '）' : ''} 剩 ${Math.ceil(f.left / 2)} 回合`); }
+  for (const id of skillHolders(vt0, true)) L.push(`${E.SKILL_NAMES[S.skills[id]]}：${TN[S.pieces[id].team]} ${pname(id)}（可發動）`);
+  if (S.act && S.act.stepover >= 0) L.push('🦶 步伐壓制已發動'); if (S.act && S.act.thunder >= 0) L.push('⚡ 雷霆穿擊已發動');
+  { const nc = S.pieces.filter(p => p.clone && p.cell >= 0 && (cfg.mode === 'local' || p.team === vt0)).length; if (nc) L.push(`👥 分身 ${nc} 個`); }
   for (const t of [0, 1]) if (S.slip && S.slip[t]) L.push(`🛢️ ${TN[t]} 腳滑（骰點 −2）`);
   for (const t of [0, 1]) { const n = S.pieces.filter(p => p.team === t && p.stun > 0).length; if (n) L.push(`🍌 ${TN[t]} ${n} 名球員暫停`); }
-  const vt = cfg.mode === 'online' ? cfg.myTeam : 0, np = (S.peels || []).filter(q => q.team === vt).length;
-  if (cfg.mode !== 'local' && np) L.push(`🍌 你暗放了 ${np} 個香蕉皮`);
+  const vt = cfg.mode === 'online' ? cfg.myTeam : 0, npb = (S.peels || []).filter(q => q.team === vt && q.kind !== 'trap').length, npt = (S.peels || []).filter(q => q.team === vt && q.kind === 'trap').length;
+  if (cfg.mode !== 'local') { if (npb) L.push(`🍌 你暗放了 ${npb} 個香蕉皮`); if (npt) L.push(`🪤 你暗放了 ${npt} 個捕鼠夾`); }
   el.innerHTML = L.map(x => `<span>${x}</span>`).join(''); el.classList.toggle('hide', !L.length);
 }
 function onTap(cell, goal) {
@@ -2421,21 +2730,26 @@ function onTap(cell, goal) {
       break;
     }
     case 'area': if (cell >= 0) { if (E.areaCenters(S, cur.fx).includes(cell)) { areaSel = cell; SND.sfx('select'); renderUI(); } else { SND.sfx('error'); log('這裡不能投擲：範圍不可涵蓋雙方深綠格'); } } break;
-    case 'peel': if (cell >= 0) { if (E.peelCells(S, cur.team).includes(cell)) doAct({ t: 'peel', cell }); else SND.sfx('error'); } break;
-    case 'swap': if (p && !p.gk) { const k = swapSel.indexOf(p.id); if (k >= 0) swapSel.splice(k, 1); else if (swapSel.length < 2) swapSel.push(p.id); SND.sfx('select'); renderUI(); } break;
+    case 'peel': if (cell >= 0) { if (E.peelCells(S, cur.team, cur.kind).includes(cell)) doAct({ t: 'peel', cell }); else SND.sfx('error'); } break;
+    case 'die': if (p && p.team === cur.team && S.skills[p.id]) openSkill(p.id); break;
+    case 'skillpick': if (p && p.team === cur.team && !p.clone && !S.skills[p.id]) doAct({ t: 'skillpick', pid: p.id }); else SND.sfx('error'); break;
+    case 'recall': if (cell >= 0) { if (E.recallCells(S, cur.team).includes(cell)) doAct({ t: 'recall', cell }); else SND.sfx('error'); } break;
+    case 'swap': if (p && !p.gk && !p.clone && (p.team === cur.team || !E.isHidden(S, p.id))) { const k = swapSel.indexOf(p.id); if (k >= 0) swapSel.splice(k, 1); else if (swapSel.length < 2) swapSel.push(p.id); SND.sfx('select'); renderUI(); } break;
     case 'pass': if (cell >= 0 && E.shotTargets(S, cur.n).includes(cell)) doAct({ t: 'shoot', cell }); else if (p && E.passTargets(S, cur.n).includes(p.id)) doAct({ t: 'pass', to: p.id }); else SND.sfx('error'); break;
     case 'respawn': if (cell >= 0 && !E.respawnCells(S, S.pieces[cur.pid]).includes(cell)) { SND.sfx('error'); log(S.pieces[cur.pid].gk ? '門將只能回到自己的球門格（發光處）' : '請點選發光的深綠格'); } else if (cell >= 0) doAct({ t: 'respawn', cell }); break;
     case 'jump': if (cell >= 0) doAct({ t: 'jump', to: cell }); break;
     case 'gk': if (cell >= 0) doAct({ t: 'gk', cell }); break;
     case 'sendoff': if (p && p.team === cur.victim && !p.gk) doAct({ t: 'sendoff', pid: p.id }); break;
     case 'fj': {
-      if (fjSel < 0) { if (p && p.team === cur.team) { fjSel = p.id; renderUI(); } }
+      if (fjSel < 0) { if (p && p.team === cur.team && !p.clone) { fjSel = p.id; renderUI(); } }
       else if (cell >= 0 && S.qa.includes(cell) && !p) doAct({ t: 'fj', pid: fjSel, to: cell });
-      else if (p && p.team === cur.team) { fjSel = p.id; renderUI(); }
+      else if (p && p.team === cur.team && !p.clone) { fjSel = p.id; renderUI(); }
       break;
     }
   }
 }
+$('skYes').onclick = () => { show('skillOv', false); const pid = skillPid; skillPid = -1; if (pid >= 0 && S && S.cur && S.cur.k === 'die' && isMine() && !busy) doAct({ t: 'skill', pid }); };
+$('skNo').onclick = () => { skillPid = -1; show('skillOv', false); SND.sfx('back'); };
 function showOver() {
   const w = S.winner; $('overTitle').textContent = `🏆 ${TN[w]} 獲勝！`;
   let sub = `最終比分　${TN[0]} ${S.score[0]} : ${S.score[1]} ${TN[1]}`;
