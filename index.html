@@ -327,8 +327,10 @@ input[type=range]{width:100%;margin-top:8px;accent-color:#3ac07c;height:28px}
     <h3>開局</h3><ul><li>由電腦<b>擲硬幣</b>決定誰先擺棋；擺完陣再擲一次決定誰先開球。之後每回合才使用骰子，骰子一律擲在場地正中央。</li></ul>
     <h3>一個回合</h3>
     <ul><li><b>選骰</b>：3 顆骰子自選 2 顆再擲，結算順序固定為<b>進攻 → 防守 → 足球</b>。進攻骰（4/5/6）長程；防守骰（1/2/3）短程、己方半場搶斷、門將搶斷；兩顆移動骰可各讓任一己方棋子走該點數。</li>
-    <li><b>⚽ 足球與足球骰</b>：足球一定在某位球員身上（開球時在先攻方的門將），球員會在原地用腳盤球。足球骰（黑白色，5／9／13）只有<b>己方持球</b>時才能選，點數＝傳球距離：持球者周圍 N 格內的隊友都可接球，點選要傳的人，球會沿直線飛過去。N 格內沒有隊友就傳丟，球掉給最近的對手。</li>
-    <li><b>得分</b>：必須由<b>持球的棋子</b>走進對方得分區才算進球；沒帶球不能得分。進球後該棋子回己方綠格，球交給對方門將，換對方先攻。持球者被搶斷，球就歸搶斷者；被鬥牛撞飛或被任意門互換，球回到對方門將。</li>
+    <li><b>⚽ 足球與足球骰</b>：足球一定在某位球員身上（開球時在先攻方的門將），球員會在原地用腳盤球。足球骰（黑白色，4／6／8／10／12／13）只有<b>己方持球</b>時才能選，點數＝傳球／射門距離：持球者周圍 N 格內的隊友都可接球，點選要傳的人，球會沿直線飛過去。N 格內沒有隊友也無法射門就傳丟，球掉給最近的對手。</li>
+    <li><b>骰子使用順序</b>：選 2 顆擲出後，由你決定先用哪一顆（例如先踢球、再移動棋子）。</li>
+    <li><b>🥅 射門</b>：用足球骰踢球時，也可以直接射門——持球者到對方球門 3 格（門將格與兩側金色門前點）之一，距離≤骰點、直線上沒有任何棋子（含己方，也含門將）擋住，就算進球；射手留在原地。門將靈壓牆也會擋住射門。</li>
+    <li><b>得分</b>：<b>持球的棋子</b>走進對方得分區，或用足球骰<b>直線射進球門</b>才算進球；沒帶球不能得分。進球後該棋子回己方綠格，球交給對方門將，換對方先攻。持球者被搶斷，球就歸搶斷者；被鬥牛撞飛或被任意門互換，球回到對方門將。</li>
     <li><b>選棋＋走位</b>：點選發光的棋子，再點亮起的格子。一般走法須走滿點數，一步＝一個相鄰六角格，同一路徑不重複走格。</li>
     <li><b>正面封堵</b>：緊貼出發棋子的敵棋不能直接穿越（需繞行）；離出發棋子 ≥2 格的敵棋可以穿過。</li></ul>
     <h3>搶斷</h3>
@@ -457,7 +459,26 @@ const toast = (S, text) => ev(S, { t: 'toast', text });
 const note = (S, team, text) => ev(S, { t: 'note', team, text });
 const _hd = {};
 function hexFrom(c) { if (_hd[c]) return _hd[c]; const d = new Int16Array(cells.length).fill(-1); d[c] = 0; const q = [c]; for (let i = 0; i < q.length; i++) for (const n of cells[q[i]].nb) if (d[n] < 0) { d[n] = d[q[i]] + 1; q.push(n); } return (_hd[c] = d); }
-const BALL_DIST = [5, 9, 13];
+const BALL_DIST = [4, 6, 8, 10, 12, 13];
+function cellNear(x, z) { let bi = -1, bd = 1e9; for (const C of cells) { const d = (C.x - x) * (C.x - x) + (C.z - z) * (C.z - z); if (d < bd) { bd = d; bi = C.id; } } return bi; }
+function lineCells(a, b) {
+  const A = cells[a], B = cells[b], n = Math.max(2, Math.ceil(Math.hypot(B.x - A.x, B.z - A.z) / .35)), out = [];
+  for (let i = 1; i < n; i++) { const u = i / n, c = cellNear(A.x + (B.x - A.x) * u, A.z + (B.z - A.z) * u); if (c !== a && c !== b && out.indexOf(c) < 0) out.push(c); }
+  return out;
+}
+// 射門：持球者到對方球門 3 格（中間門將格＋兩側門前點）之一拉直線；距離≤骰點、直線上（含目標格）無任何棋子、不穿過門將靈壓牆
+function shotTargets(S, n) {
+  if (S.ball < 0) return [];
+  const H = S.pieces[S.ball]; if (H.cell < 0) return [];
+  const d = hexFrom(H.cell), o = occ(S), wall = new Set(); for (const f of S.fx) if (f.k === 'barrier') for (const c of f.cells) wall.add(c);
+  const res = [];
+  for (const tg of GP[H.team].concat([HOME[1 - H.team]])) {
+    if (tg === H.cell || d[tg] < 0 || d[tg] > n || o[tg] !== -1 || wall.has(tg)) continue;
+    if (lineCells(H.cell, tg).some(c => o[c] !== -1 || wall.has(c))) continue;
+    res.push(tg);
+  }
+  return res;
+}
 const ballTeam = S => (S.ball < 0 ? -1 : S.pieces[S.ball].team);
 function giveBall(S, pid, kind) { S.ball = pid; ev(S, { t: 'ball', to: pid, kind }); }
 function loseBall(S, pid, kind) { if (S.ball !== pid) return false; const t = S.pieces[pid].team; giveBall(S, (1 - t) * 11, kind || 'lost'); note(S, 1 - t, '⚽ 足球回到你方門將'); return true; }
@@ -665,12 +686,13 @@ function runTask(S, t) {
       const ok = S.pieces.some(p => p.team === t.victim && !p.gk && p.cell >= 0);
       if (!ok) break; setCur(S, t, t.chooser); break;
     }
+    case 'order': setCur(S, t, t.team); break;
     case 'pass': {
-      if (ballTeam(S) !== t.team) { toast(S, '足球不在己方，傳球骰略過'); break; }
-      const tg = passTargets(S, t.n);
-      if (!tg.length) {
+      if (ballTeam(S) !== t.team) { toast(S, '足球不在己方，足球骰略過'); break; }
+      const tg = passTargets(S, t.n), st = shotTargets(S, t.n);
+      if (!tg.length && !st.length) {
         const H = S.pieces[S.ball], d = hexFrom(H.cell), opp = S.pieces.filter(p => p.team !== H.team && p.cell >= 0).sort((a, b) => d[a.cell] - d[b.cell])[0];
-        note(S, H.team, `⚽ ${t.n} 格內沒有隊友：球被傳丟了！`);
+        note(S, H.team, `⚽ ${t.n} 格內沒有隊友也無法射門：球被傳丟了！`);
         if (opp) { ev(S, { t: 'pass', from: H.id, to: opp.id, fail: true }); giveBall(S, opp.id, 'fumble'); note(S, opp.team, '⚽ 撿到對手傳丟的球'); }
         break;
       }
@@ -871,15 +893,28 @@ function act(S, a, who) {
       if (!cur || cur.k !== 'die' || !Array.isArray(a.dice) || a.dice.length !== 2) break;
       const ds = a.dice; if (ds[0] === ds[1] || ds.some(x => ['att', 'def', 'ball'].indexOf(x) < 0)) break;
       if (ds.includes('ball') && ballTeam(S) !== cur.team) break;
-      const order = ['att', 'def', 'ball'].filter(x => ds.includes(x)), sl = S.slip[cur.team] === 2 ? 2 : 0, res = [], tasks = [];
-      for (const k of order) {
-        const val = k === 'att' ? rollAtt() : k === 'def' ? rollDef() : BALL_DIST[ri(0, 2)];
-        res.push({ type: k, val });
-        if (k === 'ball') tasks.push({ k: 'pass', team: cur.team, n: val });
-        else { const use = Math.max(0, val - sl); tasks.push({ k: 'move', team: cur.team, steps: use, ctx: { kind: 'die', die: k, steps: val } }); if (sl) note(S, cur.team, `🛢️ 腳滑：${k === 'att' ? '進攻' : '防守'}骰 ${val} → ${use}`); }
-      }
+      const res = ds.map(k => ({ type: k, val: k === 'att' ? rollAtt() : k === 'def' ? rollDef() : BALL_DIST[ri(0, 5)] }));
       S.die = { dice: res, team: cur.team }; ev(S, { t: 'rolls', team: cur.team, dice: res });
-      S.cur = null; S.queue.unshift(...tasks); ok = true; break;
+      S.cur = null; S.queue.unshift({ k: 'order', team: cur.team, dice: res }); ok = true; break;
+    }
+    case 'order': {
+      if (!cur || cur.k !== 'order') break;
+      const first = cur.dice.find(d => d.type === a.first); if (!first) break;
+      const sl = S.slip[cur.team] === 2 ? 2 : 0, mk = (d) => {
+        if (d.type === 'ball') return { k: 'pass', team: cur.team, n: d.val };
+        const use = Math.max(0, d.val - sl); if (sl) note(S, cur.team, `🛢️ 腳滑：${d.type === 'att' ? '進攻' : '防守'}骰 ${d.val} → ${use}`);
+        return { k: 'move', team: cur.team, steps: use, ctx: { kind: 'die', die: d.type, steps: d.val } };
+      };
+      const list = [first].concat(cur.dice.filter(d => d !== first)).map(mk);
+      S.cur = null; S.queue.unshift(...list); ok = true; break;
+    }
+    case 'shoot': {
+      if (!cur || cur.k !== 'pass' || !shotTargets(S, cur.n).includes(a.cell)) break;
+      const H = S.pieces[S.ball], team = H.team;
+      ev(S, { t: 'shoot', from: H.id, cell: a.cell }); note(S, team, '🥅 射門！');
+      S.cur = null; const over = scoreGoal(S, team);
+      if (!over) { giveBall(S, (1 - team) * 11, 'goal'); S.bonus[team] = 0; note(S, 1 - team, '⚽ 足球交給你方門將：換你先攻'); }
+      ok = true; break;
     }
     case 'pass': {
       if (!cur || cur.k !== 'pass') break;
@@ -979,7 +1014,15 @@ function autoAction(S, strat) {
       if (own && Math.random() < (smart ? .6 : .5)) return { t: 'roll', dice: [Math.random() < .5 ? 'att' : 'def', 'ball'] };
       return { t: 'roll', dice: ['att', 'def'] };
     }
-    case 'pass': { const tg = passTargets(S, c.n).map(i => S.pieces[i]); tg.sort((a, b) => progress(c.team, b.cell) - progress(c.team, a.cell)); return { t: 'pass', to: (smart ? (Math.random() < .8 ? tg[0] : pick(tg)) : pick(tg)).id }; }
+    case 'order': {
+      const hasB = c.dice.find(d => d.type === 'ball');
+      if (hasB && shotTargets(S, hasB.val).length && smart) return { t: 'order', first: 'ball' };
+      return { t: 'order', first: pick(c.dice).type };
+    }
+    case 'pass': {
+      const st = shotTargets(S, c.n); if (st.length && (smart || Math.random() < .5)) return { t: 'shoot', cell: pick(st) };
+      if (st.length && !passTargets(S, c.n).length) return { t: 'shoot', cell: pick(st) };
+      const tg = passTargets(S, c.n).map(i => S.pieces[i]); tg.sort((a, b) => progress(c.team, b.cell) - progress(c.team, a.cell)); return { t: 'pass', to: (smart ? (Math.random() < .8 ? tg[0] : pick(tg)) : pick(tg)).id }; }
     case 'move': {
       const m = movable(S, c); let best = null, bv = -1e9;
       for (const pid of Object.keys(m)) {
@@ -1022,7 +1065,7 @@ function autoAction(S, strat) {
 }
 
 const E = { cells, cid, DARK, genQA, isQA, HOME, GP, CARDS, KINDS, TEAM_NAMES, FORMATIONS, COLS, MID, SQ3,
-  newState, act, advance, reach, hexFrom, passTargets, ballTeam, BALL_DIST, areaOf, areaCenters, peelCells, blockedSet, inArea, noQA, gkLocked, FX_DUR, movable, occ, respawnCells, jumpTargets, autoAction, progress, remaining, canSteal };
+  newState, act, advance, reach, hexFrom, passTargets, shotTargets, lineCells, ballTeam, BALL_DIST, areaOf, areaCenters, peelCells, blockedSet, inArea, noQA, gkLocked, FX_DUR, movable, occ, respawnCells, jumpTargets, autoAction, progress, remaining, canSteal };
 if (typeof module !== 'undefined' && module.exports) module.exports = E; else G.OG = E;
 })(typeof window !== 'undefined' ? window : globalThis);
 
@@ -1646,7 +1689,7 @@ async function slipEvent(e) {
 }
 
 /* ---------- 足球 ---------- */
-let ballMesh = null, ballHolder = -1, ballFly = false, ballShadow = null, ballLastT = 0;
+let ballMesh = null, ballHolder = -1, ballFly = false, ballFree = false, ballShadow = null, ballLastT = 0;
 function ballTex() {
   return canvasTex(512, 256, (g) => {
     g.fillStyle = '#fff'; g.fillRect(0, 0, 512, 256); g.fillStyle = '#161616';
@@ -1662,7 +1705,7 @@ function makeBallMesh() {
 }
 function ballTick(t) {
   if (!ballMesh) return; const dt = Math.min(.1, t - ballLastT); ballLastT = t;
-  if (ballFly) return;
+  if (ballFly || ballFree) return;
   if (ballHolder < 0) { ballMesh.visible = false; ballShadow.visible = false; return; }
   const m = pm[ballHolder]; if (!m || !m.g.visible) { return; }
   const dir = ballHolder < 11 ? 1 : -1, ph = t * 5.5 + ballHolder;
@@ -1673,10 +1716,11 @@ function ballTick(t) {
 }
 const trailPool = [];
 async function ballFlight(e, S, high) {
-  const toP = S.pieces[e.to], dir = e.to < 11 ? 1 : -1; if (!ballMesh) return;
-  const tc = toP.cell >= 0 ? cellXZ(toP.cell) : { x: ballMesh.position.x, z: ballMesh.position.z };
-  const A = ballMesh.position.clone(), B = new THREE.Vector3(tc.x + dir * .78, .38, tc.z);
-  const dist = Math.hypot(B.x - A.x, B.z - A.z), dur = Math.min(1.6, Math.max(.55, dist / 20 + .35)), H = Math.max(2.2, Math.min(high ? 11 : 8.5, dist * (high ? .42 : .3)));
+  if (!ballMesh) return; const shot = e.cell !== undefined, dir = shot ? (e.from < 11 ? 1 : -1) : (e.to < 11 ? 1 : -1);
+  const toP = shot ? null : S.pieces[e.to];
+  const tc = shot ? cellXZ(e.cell) : (toP.cell >= 0 ? cellXZ(toP.cell) : { x: ballMesh.position.x, z: ballMesh.position.z });
+  const A = ballMesh.position.clone(), B = shot ? new THREE.Vector3(tc.x + dir * 1.5, .9, tc.z) : new THREE.Vector3(tc.x + dir * .78, .38, tc.z);
+  const dist = Math.hypot(B.x - A.x, B.z - A.z), dur = shot ? Math.min(1.1, Math.max(.45, dist / 30 + .25)) : Math.min(1.6, Math.max(.55, dist / 20 + .35)), H = shot ? Math.min(2.2, 1 + dist * .05) : Math.max(2.2, Math.min(high ? 11 : 8.5, dist * (high ? .42 : .3)));
   ballFly = true; ballMesh.visible = true; ballShadow.visible = true;
   // 傳球軌跡：地面光線 + 殘影
   const ang = Math.atan2(B.z - A.z, B.x - A.x);
@@ -1696,14 +1740,14 @@ async function ballFlight(e, S, high) {
     trail.forEach((sp, i) => { const h = hist[(i + 1) * 2]; if (h) { sp.visible = true; sp.position.set(h.x, h.y, h.z); } });
     const len = Math.max(.01, Math.hypot(x - A.x, z - A.z)); line.scale.x = len; line.position.set((A.x + x) / 2, .19, (A.z + z) / 2); line.material.opacity = .75 * (1 - u * .3);
   }, t => t);
-  ballMesh.position.copy(B); ballHolder = e.to; ballFly = false;
+  ballMesh.position.copy(B); if (shot) { ballFree = true; } else { ballHolder = e.to; ballFree = false; } ballFly = false;
   // 落點特效：擴散光環 + 小彈跳
   const ring = new THREE.Mesh(new THREE.RingGeometry(.4, .62, 28), new THREE.MeshBasicMaterial({ color: 0xffffaa, transparent: true, opacity: .9, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false }));
   ring.rotation.x = -Math.PI / 2; ring.position.set(B.x, .2, B.z); scene.add(ring);
   tween(.6, (u) => { ring.scale.setScalar(1 + u * 3.2); ring.material.opacity = .9 * (1 - u); line.material.opacity = .5 * (1 - u); trail.forEach(sp => { sp.material.opacity *= .85; }); }, easeOut).then(() => {
     scene.remove(ring, line); ring.geometry.dispose(); ring.material.dispose(); line.geometry.dispose(); line.material.dispose(); trail.forEach(sp => { scene.remove(sp); sp.geometry.dispose(); sp.material.dispose(); });
   });
-  const to = pm[e.to]; if (to && to.g.visible) tween(.35, (u) => { to.inner.position.y = Math.sin(u * Math.PI) * .22; }, t => t).then(() => { to.inner.position.y = 0; });
+  const to = shot ? null : pm[e.to]; if (to && to.g.visible) tween(.35, (u) => { to.inner.position.y = Math.sin(u * Math.PI) * .22; }, t => t).then(() => { to.inner.position.y = 0; });
 }
 async function ballEvent(e, S) {
   if (!ballMesh) return;
@@ -1711,6 +1755,7 @@ async function ballEvent(e, S) {
   if (e.kind === 'steal') { ballHolder = e.to; popEmoji('⚽', ballMesh.position.x, ballMesh.position.z, 1.6); return; }
   if (e.kind === 'kickoff') { ballHolder = e.to; return; }
   await ballFlight({ to: e.to }, S, true); // 進球 / 失球：高吊回對方門將
+  ballFree = false;
 }
 /* ---------- 棋子 ---------- */
 const SKIN = [0xf6d0b0, 0xe0a97a, 0xc58a5a, 0x8d5a3a], HAIR = [0x2a1a10, 0x5a3a20, 0x111111, 0xc9a050, 0x8a3a1a, 0xaaaaaa];
@@ -1747,7 +1792,7 @@ function cellXZ(i) { return { x: cells[i].x, z: cells[i].z }; }
 function placeMesh(pm_, cell) { if (cell < 0) { pm_.g.visible = false; pm_.cell = -1; return; } const p = cellXZ(cell); pm_.g.position.set(p.x, .12, p.z); pm_.g.visible = true; pm_.g.scale.setScalar(1); pm_.cell = cell; }
 
 /* ---------- 骰子 / 卡牌 ---------- */
-const DIE_FACES = { att: [4, 6, 5, 5, 6, 4], def: [1, 3, 2, 2, 3, 1], ball: [5, 13, 9, 9, 13, 5] };
+const DIE_FACES = { att: [4, 6, 5, 5, 6, 4], def: [1, 3, 2, 2, 3, 1], ball: [4, 6, 8, 10, 12, 13] };
 function dieFaceTex(n, bg) {
   return canvasTex(256, 256, (g) => {
     g.fillStyle = bg; g.fillRect(0, 0, 256, 256); g.strokeStyle = 'rgba(0,0,0,.25)'; g.lineWidth = 14; g.strokeRect(7, 7, 242, 242);
@@ -2010,7 +2055,7 @@ function sync(S) {
   if (S.qa) setQA(S.qa, false);
   for (const P of S.pieces) { const m = pm[P.id]; if (m.busy) continue; placeMesh(m, P.cell); if (P.cell >= 0) m.inner.position.y = 0; }
   syncFx(S, false);
-  if (!ballFly) ballHolder = S.ball === undefined ? -1 : S.ball;
+  if (!ballFly) { ballHolder = S.ball === undefined ? -1 : S.ball; ballFree = false; }
 }
 function resetAll() { ballHolder = -1; ballFly = false; if (ballMesh) { ballMesh.visible = false; ballShadow.visible = false; } fxSig = ''; if (fxRoot) { scene.remove(fxRoot); fxRoot = null; fxAnim = []; } for (const m of pm) { m.busy = false; m.g.visible = false; m.cell = -1; if (m.dizzy) m.dizzy.visible = false; } dice.att.visible = false; dice.def.visible = false; dice.ball.visible = false; if (coin) coin.visible = false; setHighlights([]); setPick(new Set(), -1); setGoalGlow(-1); }
 function sideFrom(team) { return { x: team === 0 ? -14 : 14, z: 15.2 }; }
@@ -2047,6 +2092,7 @@ async function playEvent(e, S) {
     case 'qa': setQA(e.cells, true); break;
     case 'card': await flyCard(E.CARDS[e.id]); break;
     case 'goal': break;
+    case 'shoot': await ballFlight({ from: e.from, cell: e.cell }, S, false); break;
     case 'pass': await ballFlight({ from: e.from, to: e.to }, S, false); if (e.fail) { popEmoji('💢', ballMesh.position.x, ballMesh.position.z, 2); } break;
     case 'ball': await ballEvent(e, S); break;
     case 'fx': syncFx(S, true); break;
@@ -2152,6 +2198,7 @@ async function playEvents(evs) {
         case 'toast': log(e.text); await sleep(180); break;
         case 'turn': if (S.phase === 'play') SND.sfx('turn'); if (autoFlip && cfg.mode === 'local') { V.setMyTeam(e.team); V.preset('tactic'); } break;
         case 'rolls': log(`${TN[e.team]} 擲 ` + e.dice.map(d => ({ att: '進攻骰', def: '防守骰', ball: '足球骰' }[d.type]) + ' ' + d.val).join('、')); SND.sfx('dice'); await V.playEvent(e, S); break;
+        case 'shoot': log(`🥅 ${pname(e.from)} 直線射門！`); SND.sfx('kick'); await V.playEvent(e, S); break;
         case 'pass': log(e.fail ? '⚽ 傳球失誤，球被對手撿走' : `⚽ 傳球：${pname(e.from)} → ${pname(e.to)}`); SND.sfx('kick'); await V.playEvent(e, S); SND.sfx(e.fail ? 'bad' : 'select'); break;
         case 'ball': if (e.kind === 'steal') SND.sfx('steal'); await V.playEvent(e, S); break;
         case 'dice': log(`${TN[e.team]} 擲 ${e.type === 'att' ? '進攻骰' : '防守骰'}：${e.val}`); SND.sfx('dice'); await V.playEvent(e, S); break;
@@ -2247,12 +2294,19 @@ function renderUI() {
         if (S.gkp[cur.team] && S.pieces[cur.team * 11].cell >= 0) btns.unshift({ html: '🛡️ 發動門將威能<small>門將腳下與左右 3 格靈壓牆 2 回合（不耗回合）</small>', cls: 'pri', fn: () => doAct({ t: 'gkskill' }) });
         break;
       }
+      case 'order': {
+        const NM = { att: '進攻骰', def: '防守骰', ball: '⚽ 足球骰' };
+        pr = `${tag(c)} <b>決定骰子使用順序</b>：先用哪一顆？（另一顆在前一顆結算完後使用）`;
+        btns = cur.dice.map(d => ({ html: `先用 ${NM[d.type]} ${d.val}<small>${d.type === 'ball' ? '傳球 / 射門距離 ' + d.val + ' 格' : '移動 ' + d.val + ' 步'}</small>`, cls: d.type, fn: () => doAct({ t: 'order', first: d.type }) }));
+        break;
+      }
       case 'pass': {
-        const tg = E.passTargets(S, cur.n), H = S.pieces[S.ball];
-        pr = `${tag(c)} ⚽ 足球骰 <b>${cur.n}</b>：點選 ${cur.n} 格內發光的<b>隊友</b>傳球（${pname(H.id)} 持球）`;
+        const tg = E.passTargets(S, cur.n), st = E.shotTargets(S, cur.n), H = S.pieces[S.ball];
+        pr = `${tag(c)} ⚽ 足球骰 <b>${cur.n}</b>：點選 ${cur.n} 格內的<b>隊友</b>傳球` + (st.length ? '，或點<b>金色球門格</b>直線射門' : '') + `（${pname(H.id)} 持球）`;
         for (const id of tg) pick.add(id);
-        hl.push({ cell: H.cell, kind: 'goal' });
+        hl.push({ cell: H.cell, kind: 'sel' });
         for (const id of tg) hl.push({ cell: S.pieces[id].cell, kind: 'move' });
+        for (const cc of st) hl.push({ cell: cc, kind: 'goal' });
         break;
       }
       case 'move': {
@@ -2368,7 +2422,7 @@ function onTap(cell, goal) {
     case 'area': if (cell >= 0) { if (E.areaCenters(S, cur.fx).includes(cell)) { areaSel = cell; SND.sfx('select'); renderUI(); } else { SND.sfx('error'); log('這裡不能投擲：範圍不可涵蓋雙方深綠格'); } } break;
     case 'peel': if (cell >= 0) { if (E.peelCells(S, cur.team).includes(cell)) doAct({ t: 'peel', cell }); else SND.sfx('error'); } break;
     case 'swap': if (p && !p.gk) { const k = swapSel.indexOf(p.id); if (k >= 0) swapSel.splice(k, 1); else if (swapSel.length < 2) swapSel.push(p.id); SND.sfx('select'); renderUI(); } break;
-    case 'pass': if (p && E.passTargets(S, cur.n).includes(p.id)) doAct({ t: 'pass', to: p.id }); else SND.sfx('error'); break;
+    case 'pass': if (cell >= 0 && E.shotTargets(S, cur.n).includes(cell)) doAct({ t: 'shoot', cell }); else if (p && E.passTargets(S, cur.n).includes(p.id)) doAct({ t: 'pass', to: p.id }); else SND.sfx('error'); break;
     case 'respawn': if (cell >= 0 && !E.respawnCells(S, S.pieces[cur.pid]).includes(cell)) { SND.sfx('error'); log(S.pieces[cur.pid].gk ? '門將只能回到自己的球門格（發光處）' : '請點選發光的深綠格'); } else if (cell >= 0) doAct({ t: 'respawn', cell }); break;
     case 'jump': if (cell >= 0) doAct({ t: 'jump', to: cell }); break;
     case 'gk': if (cell >= 0) doAct({ t: 'gk', cell }); break;
